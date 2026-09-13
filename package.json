@@ -1,0 +1,14 @@
+{
+  "name": "agent-astromech-maintainer-tools",
+  "private": true,
+  "version": "0.0.0",
+  "description": "Pinned maintainer tooling for agent-astromech",
+  "engines": {
+    "node": ">=22.20.0"
+  },
+  "packageManager": "npm@11.8.0",
+  "devDependencies": {
+    "skills": "1.5.26",
+    "skills-ref": "0.1.5"
+  }
+}

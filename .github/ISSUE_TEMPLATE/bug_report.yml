@@ -1,0 +1,26 @@
+name: Bug 回報
+description: 回報可重現的 skill、腳本、安裝或文件問題
+title: "bug: "
+labels: [bug]
+body:
+  - type: textarea
+    id: summary
+    attributes:
+      label: 問題摘要
+      description: 說明預期與實際行為。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: 重現步驟
+      placeholder: 包含 Windows 版本、AI Desktop／TUI／CLI、MyR2D2 commit 與最小安全指令。
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: 驗證證據
+      description: 只貼最小必要輸出；不要附憑證、個資、私人 prompt 或真實 review 內容。
+    validations:
+      required: true

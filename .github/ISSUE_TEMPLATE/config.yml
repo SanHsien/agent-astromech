@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 安全漏洞
+    url: https://github.com/SanHsien/MyR2D2/security/advisories/new
+    about: 請使用私人漏洞回報，不要公開敏感細節。
+  - name: Upstream MyR2D2
+    url: https://github.com/tingyulu/MyR2D2
+    about: 查閱原始專案與上游歷史；fork 專屬問題留在本 repo。

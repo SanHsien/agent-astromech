@@ -1,0 +1,75 @@
+name: Dependency freshness
+
+# Dependabot proposes upgrades one pull request at a time. Once a month this
+# asks the other question: across every declared dependency, how much is behind,
+# and is anything vulnerable? Read-only -- it installs nothing and merges
+# nothing. Like `upstream-check`, it reports by failing the run and writing the
+# step summary rather than by opening an issue.
+
+on:
+  schedule:
+    # Monthly on day 1 at 11:05 Asia/Taipei.
+    - cron: "5 3 1 * *"
+  push:
+    branches: [main]
+    paths:
+      - package.json
+      - package-lock.json
+      - tools/check_dependency_freshness.py
+      - tests/test_dependency_freshness.py
+      - .github/dependency-deferrals.json
+      - .github/workflows/dependency-freshness.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: dependency-freshness
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Dependency freshness
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: "1"
+      PYTHONIOENCODING: "utf-8"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned maintainer tools
+        run: npm ci --ignore-scripts --no-fund
+
+      - name: Check dependency freshness
+        id: deps
+        run: >-
+          python3 tools/check_dependency_freshness.py
+          --github-output
+          --output dependency-freshness-report.md
+
+      - name: Publish report
+        if: always()
+        run: cat dependency-freshness-report.md >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Require review when something is behind
+        if: steps.deps.outputs.needs_attention == 'true'
+        run: |
+          echo "::error::A declared dependency is behind, vulnerable, or the check itself failed. Read the workflow summary, then either upgrade it or record the decision in .github/dependency-deferrals.json with a reason."
+          exit 1
