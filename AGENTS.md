@@ -1,6 +1,6 @@
 # AGENTS.md
 
-本檔提供 Codex、Claude Code、Cursor 與其他自動化代理在本 fork 工作時的共同指引。產品規格先讀 [`README.md`](README.md) 與 [`CLAUDE.md`](CLAUDE.md)；開發與驗收細節見 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)。（`CLAUDE.md` 的上游產品規則內容已併入本檔「開發約定（原 CLAUDE.md，上游產品規則）」一節，見下方。）
+本檔提供 Codex、Claude Code、Cursor 與其他自動化代理在本 fork 工作時的共同指引。產品規格先讀 [`README.md`](README.md) 與本檔「開發約定」一節；開發與驗收細節見 [`docs/DEVELOPMENT.md`](docs/DEVELOPMENT.md)。（`CLAUDE.md` 的上游產品規則內容已併入本檔「開發約定（原 CLAUDE.md，上游產品規則）」一節，見下方。）
 
 ## 專案定位
 
@@ -18,12 +18,12 @@
 
 ## 硬性邊界
 
-- 遵守 `CLAUDE.md` 的去識別化、SKILL.md 格式、連動清單、版號與本機安裝隔離規則。（規則原文已併入本檔「開發約定（原 CLAUDE.md，上游產品規則）」一節。）
+- 遵守本檔「開發約定」一節的去識別化、SKILL.md 格式、連動清單、版號與本機安裝隔離規則。（規則原文已併入本檔「開發約定（原 CLAUDE.md，上游產品規則）」一節。）
 - 不提交 API key、token、cookie、帳號資料、私人 prompt、真實客戶資料或 `.ai-reviews/` 產物。
 - 跨模型 review 前先去識別化；送給後端的內容視為已離開本機信任邊界。
 - 不把 Git Bash／NTFS 的 mode-bit 顯示當成 POSIX 權限證據。`0600` 安全斷言由 Linux CI 驗證。
 - 不對 `main` force-push，不刪除 `upstream` remote，不盲目 merge upstream。
-- 不新增 CHANGELOG；版本與 release 慣例沿用 `CLAUDE.md`。
+- 不新增 CHANGELOG；版本與 release 慣例沿用本檔「開發約定」一節。
 
 ## 開發約定（原 CLAUDE.md，上游產品規則）
 

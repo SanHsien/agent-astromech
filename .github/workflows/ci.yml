@@ -94,14 +94,14 @@ jobs:
 
       - name: 公開內容守門 grep(鐵則1 泛型版)
         run: |
-          # 白名單四類,逐條對應 repo 已宣告的預期命中(CLAUDE.md 鐵則1「已知的預期命中」節):
-          # 1. CLAUDE.md 整檔 —— 它是規則書,表格裡示範「私人寫法長什麼樣」必然含 pattern 字面
+          # 白名單四類,逐條對應 repo 已宣告的預期命中(AGENTS.md「開發約定」鐵則1「已知的預期命中」節;原 CLAUDE.md 已併入 AGENTS.md):
+          # 1. AGENTS.md 整檔 —— 它是規則書,表格裡示範「私人寫法長什麼樣」必然含 pattern 字面
           # 2. 本 workflow 檔自己 —— 執法者必然含 pattern 字面(首跑就是被自己的 pattern 行打紅的)
           # 3. 「Notion、Linear」「Notion, Linear」—— README/dropoff/pickup「接上你自己的任務系統」
           #    對第三方產品的通用舉例
           # 4. 「Notion 上傳/Telegram/Slack」—— daily-debrief 的 JOURNAL_POST_CMD 通用舉例
           # 白名單只准這樣逐字面收窄,不准整檔排除 README/skills(會蓋掉未來的真外洩)。
-          HITS=$(git grep -inE "/Users/|~/(Documents|ClaudeProjects)/|Notion|telegram" -- ':!CLAUDE.md' ':!.github/workflows/ci.yml' \
+          HITS=$(git grep -inE "/Users/|~/(Documents|ClaudeProjects)/|Notion|telegram" -- ':!AGENTS.md' ':!.github/workflows/ci.yml' \
             | grep -vF 'Notion、Linear' \
             | grep -vF 'Notion, Linear' \
             | grep -vF 'Notion 上傳/Telegram/Slack' || true)
