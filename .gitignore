@@ -1,0 +1,14 @@
+.DS_Store
+
+# session 本地產物：交接卡等，不進公開 repo
+.claude/
+
+# 執行殘留：不進 repo
+__pycache__/
+.ai-reviews/
+.ai-searches/
+
+# 維護工具本機產物
+node_modules/
+upstream-review-report.md
+skills-lock.json

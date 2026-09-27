@@ -1,0 +1,26 @@
+name: 功能建議
+description: 提議可驗證、符合 MyR2D2 邊界的改進
+title: "feat: "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 要解決的問題
+      description: 描述使用情境與目前缺口，不只列解法名稱。
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建議方法
+      description: 說明介面、相容性、資料邊界與驗證方式。
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: 範圍確認
+      options:
+        - label: 不需要提交憑證、個資或私有資料即可討論與驗證。
+          required: true

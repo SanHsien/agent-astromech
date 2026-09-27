@@ -1,0 +1,65 @@
+name: Upstream check
+
+on:
+  schedule:
+    - cron: "30 0 * * 1"
+  push:
+    branches: [main]
+    paths:
+      - tools/upstream_baseline.json
+      - tools/check_upstream_updates.py
+      - tests/test_upstream_updates.py
+      - .github/workflows/upstream-check.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: upstream-check
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: Upstream review status
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PYTHONUTF8: "1"
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: "3.14"
+
+      - name: Test the upstream checker
+        run: python -m unittest discover -s tests -p 'test_upstream_updates.py' -v
+
+      - name: Compare upstream against review watermarks
+        id: upstream
+        run: >-
+          python tools/check_upstream_updates.py
+          --github-output
+          --output upstream-review-report.md
+
+      - name: Publish report
+        if: always()
+        run: |
+          if [ -f upstream-review-report.md ]; then
+            cat upstream-review-report.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Upstream checker failed before producing a report." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Mark review as required
+        if: steps.upstream.outputs.needs_attention == 'true'
+        run: |
+          echo "::error::Upstream has unreviewed commits, PRs, issues, or branch changes."
+          exit 1
