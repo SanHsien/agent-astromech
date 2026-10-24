@@ -154,3 +154,7 @@ commit、PR、issue 與 branch head 分別記錄。Baseline 表示已審查，�
 ## 2026-09-30：審查上游 `936d8ed`（英文版速查小抄）
 
 skip：12 支版的英文小抄與圖卡對不上本 fork 的 14 支，且無圖卡來源檔可重製。Baseline 推進至 `936d8ed`，表示已審查、未合併。證據見 `docs/UPSTREAM.md` 2026-09-30 段。
+
+## 2026-10-25：審查上游 `32bef4e`（9 個 commit）
+
+adopt：`0d1d9ee`（收割器一則回應只算一次，移植做法進 fork 已分歧的 `harvest.py`）、`37ef4d7`／`142b003`（token-optimizer）、`fd00d5e`（damage-report 字句）。defer：`systems-check` 新 skill（Windows 原生 `import fcntl` 即失敗、selftest 21/39，主平台跑不起來）與 `32bef4e` 的 tag 版號 CI 步驟。Baseline 推進至 `32bef4e`，表示已審查，defer 項不算已合併。證據見 `docs/UPSTREAM.md` 2026-10-25 段。

@@ -119,6 +119,18 @@ v0.8.1 收尾時仍掛著兩項「本 fork 未驗」。兩項都用繞道補上�
 | `936d8ed` 英文版速查小抄（`cheatsheet.en.md`／`.html`／`.png`＋README、`CLAUDE.md`、`cheatsheet.md` 連結） | **skip** | 7 檔 +105/-3，全為文件與圖卡；英文小抄內容寫「All 12 skills」，本 fork 為 14 支，且沒有重製圖卡的來源檔——與 `cheatsheet.png` 同一理由。重查條件：fork 自行維護 14 支版小抄時再評估英文版。 |
 | PR／issue | 無新項目 | checker 回報 PR 0、issue 0 |
 
+## 2026-10-25 審查：`936d8ed` → `32bef4e`（9 個 commit；PR 0、issue 0）
+
+| 上游 commit | 內容 | 判斷 | 證據 |
+|---|---|---|---|
+| `0d1d9ee` | `mission-log` 收割器：同一則 API 回應拆成多行時只算一次（按 `message.id` 併、requestId 回併、矛盾標 `usage_conflict`、跨午夜歸第一行那天），並同步 `save-all`／`mission-log` 文件 | `adopt`（移植做法） | 本 fork 的 `harvest.py` 已分歧（`--timezone`、完整 session id、型別防護），不能套 diff。把去重函式接進 fork 結構，型別不對的 usage 欄略過並計數；4 個上游測試併入 fork 測試，`harvest_test.py` 20/20（原 16＋4）。`docs/TEST_PLAN.md` 新增 J-07。 |
+| `37ef4d7` `142b003` | `token-optimizer`：派工前先報估算、收尾對帳；effort 與 fork 子代理的硬層事實；別名說明 | `adopt` | `git merge-file` 三方合併無衝突（fork 對該檔未改）。 |
+| `fd00d5e` | `token-optimizer` 機制修正＋`damage-report` 審計字句收斂（「最多 2–3 條」改「只列真值得做的」）＋四份 prompts | `adopt` | 同上，`skills/damage-report`、`prompts/damage-report*.md` 三方合併無衝突。 |
+| `1be1747` `c3b4752` `570c4a9` `5d9e3d3` | 新增第 13 支 skill `systems-check`（agent 自我體檢；3 支 Python、約 4,400 行）＋全套連動＋版號 v0.8.0 | **defer** | 在 Windows 原生實測：`selfcheck_scan.py --selftest` 為 **21/39**（18 項失敗，輸出為亂碼，未逐項追根因）、`selfcheck_state.py` 開頭 `import fcntl` 直接 `ModuleNotFoundError`。本 fork 的主平台是 Windows 11，收進來會讓 skill 計數 14→15 並牽動 README 雙語、plugin metadata、adapter、TEST_PLAN、contract checker，卻有一半功能在主平台跑不起來。重查條件：上游修掉 `fcntl`／Windows 相容，或本 fork 願意自行改寫為跨平台並補 Windows 測試。 |
+| `32bef4e` | CI：推 `v*` tag 也跑 CI，最後一步檢查 `plugin.json` 版號等於 tag | `defer` | 與 `systems-check` 的 CI 步驟同批；fork 的 `plugin.json`（0.9.1）目前與最新 tag 一致，但 tag 觸發會讓每次 `git push --tags` 多跑一輪完整矩陣。重查條件：fork 出現 tag 與版號不一致的事故時再採。 |
+
+結構：`docs/cheatsheet*`、`README*`、`CLAUDE.md`、`marketplace.json` 的上游改動都只為 `systems-check` 與 12→13 計數，隨該 skill 一併 defer，不單獨收。
+
 ## 判斷規則
 
 - `adopt`：本 fork 已採用並有驗證證據。

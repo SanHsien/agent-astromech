@@ -277,6 +277,16 @@ agent 明講「先用 mission-log harvest 零 token 撈了 7 天骨架（全部�
 放一個假日期（>30 天前）的日報檔再跑 daily → 檔案被移入 `journal/archive/YYYY-MM/`，且 weekly 不讀 archive。
 狀態（2026-08-02~03）：✅ 已實測（端到端）。
 
+### J-07 🟢 一則回應只算一次（回歸，上游 `0d1d9ee` 移植）
+
+```bash
+python3 skills/mission-log/tests/harvest_test.py
+```
+
+**通過**：harvest_test 全綠（含此四案）——`test_one_response_counted_once`（同 id 三行只算一則、output 取最大；負對照：id 各異照算四則）、`test_requestid_alias_and_synthetic`（沒 id 的行用 requestId 併回；`<synthetic>` 借同 requestId 但有自己的 id ⇒ 自己算一則、0 token、不算矛盾）、`test_usage_conflict_reported_not_summed`（同 id 兩組非零不等的 input、或對到兩個 requestId ⇒ turns 照算、tokens 不計、列上 `usage_conflict`＋stderr 警告＋md 標記）、`test_midnight_straddle_belongs_to_first_line_day`（跨午夜回應歸第一行那天、翌日不重算也不多出 session）。
+由來：transcript 每個 content block 一行、同一份 usage 重抄、`output_tokens` 是串流累計快照；舊版逐行加把 turns／tokens 灌水約 2 倍（本機實測 10-02 一天 3.3 倍，另一台每日 1.6〜7.2 倍）。真資料對照：同一天舊版 vs 新版，工具直方圖與原話逐 session 相同、只有 turns／tokens 縮水，證明只動了用量口徑。
+本 fork 移植的是做法而非 diff：fork 的 `harvest.py` 已有 `--timezone`、完整 session id 與型別防護，去重邏輯接進該結構；型別不對的 usage 欄改為「略過並計數」。
+
 ---
 
 ## D. 交接門鈴（dropoff/pickup 的跨 session 即時通知，v0.4.0 起）

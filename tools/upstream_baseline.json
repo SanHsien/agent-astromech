@@ -2,10 +2,10 @@
   "schema_version": 1,
   "upstream": "tingyulu/MyR2D2",
   "default_branch": "main",
-  "reviewed_through": "936d8ed8e15aa9445d277f547ac32b16c9b97673",
+  "reviewed_through": "32bef4ecbedf2f50b15abd9e1dbd3bacd5efa417",
   "reviewed_pr_through": 0,
   "reviewed_issue_through": 0,
   "reviewed_branches": {
-    "main": "936d8ed8e15aa9445d277f547ac32b16c9b97673"
+    "main": "32bef4ecbedf2f50b15abd9e1dbd3bacd5efa417"
   }
 }
