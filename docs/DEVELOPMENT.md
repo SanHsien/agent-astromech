@@ -43,7 +43,7 @@ for d in skills/*/; do ./node_modules/.bin/skills-ref validate "$d"; done
 
 ## 修改連動
 
-改任何 skill 前先讀 `CLAUDE.md` 的連動清單。README 雙語行數、plugin metadata、adapter、測試計畫與 skill 計數都屬公開契約。
+改任何 skill 前先讀 `AGENTS.md`「改一支 skill 的連動清單（詳細版）」一節。README 雙語行數、plugin metadata、adapter、測試計畫與 skill 計數都屬公開契約。
 
 ## 遠端驗證
 

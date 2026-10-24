@@ -4,7 +4,7 @@
 
 ## 開始之前
 
-1. 閱讀 `AGENTS.md`、`CLAUDE.md` 與 `docs/DEVELOPMENT.md`。
+1. 閱讀 `AGENTS.md`（含「開發約定」一節）與 `docs/DEVELOPMENT.md`。
 2. 從最新 `main` 開始，保持變更單一目的。
 3. 不提交憑證、個資、私人 prompt 或真實 review 內容。
 4. 行為修正先加入失敗測試；文件修正要同步繁中／英文契約。

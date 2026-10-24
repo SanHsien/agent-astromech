@@ -62,11 +62,11 @@ git -C "$TARGET" init -q
 
 ### REG-04 🟢 公開內容守門
 
-跑 repo `CLAUDE.md` 鐵則 1 的守門 grep（含 `--untracked` 與 `-i`），除已知預期命中外 0 命中。
+跑 repo `AGENTS.md`「去識別化（公開 repo 動筆前）」一節的守門 grep（含 `--untracked` 與 `-i`），除已知預期命中外 0 命中。
 
 ### REG-05 🟢 文件連動掃描
 
-依 `CLAUDE.md` 鐵則 3 連動清單逐項核對（README 雙檔／plugin.json／marketplace.json／adapters 矩陣）。
+依 `AGENTS.md`「改一支 skill 的連動清單（詳細版）」一節逐項核對（README 雙檔／plugin.json／marketplace.json／adapters 矩陣）。
 
 ---
 

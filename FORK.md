@@ -21,7 +21,7 @@
 - agent-astromech 名稱與 `agent-astromech` plugin identifier。
 - 上游 12 支 skill 的既有指令；`mission-log` 只新增可選的 `--timezone`，舊用法維持有效。
 - 上游作者歸屬與 MIT License。
-- `CLAUDE.md` 規定的雙語連動、去識別化與發布原則。
+- `AGENTS.md`「開發約定」一節規定的雙語連動、去識別化與發布原則。
 
 ## 同步方法
 
