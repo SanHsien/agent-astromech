@@ -8,7 +8,7 @@
   },
   "packageManager": "npm@11.8.0",
   "devDependencies": {
-    "skills": "1.7.1",
+    "skills": "1.7.4",
     "skills-ref": "0.1.5"
   }
 }
