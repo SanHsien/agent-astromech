@@ -59,6 +59,16 @@ class StatusTests(unittest.TestCase):
         self.assertEqual(checker.status_for(row), "Ahead of dist-tag latest")
         self.assertFalse(checker.needs_maintenance(row))
 
+    def test_pinned_prerelease_behind_its_stable_release_is_maintenance(self):
+        # 2.0.0-rc.1 sorts before 2.0.0; the stable release is an update.
+        row = {"current": "2.0.0-rc.1", "wanted": "2.0.0-rc.1", "latest": "2.0.0"}
+        self.assertEqual(checker.status_for(row), "Newer release to assess")
+        self.assertTrue(checker.needs_maintenance(row))
+
+    def test_stable_release_is_not_behind_its_own_prerelease(self):
+        row = {"current": "2.0.0", "wanted": "2.0.0", "latest": "2.0.0-rc.1"}
+        self.assertFalse(checker.needs_maintenance(row))
+
 
 class DeferralTests(unittest.TestCase):
     def test_deferral_silences_the_exact_version_it_was_judged_against(self):
@@ -113,6 +123,23 @@ class CheckDependenciesTests(unittest.TestCase):
         )
         self.assertEqual(rows, [])
         self.assertEqual(error, "")
+
+    def test_audit_that_could_not_reach_the_registry_is_not_reported_clean(self):
+        # npm audit exits 1 with {"message", "error"} and no metadata when the
+        # advisory endpoint fails. That is a failed check, not zero findings.
+        failed = json.dumps({"message": "request failed, reason: ECONNREFUSED", "error": {"summary": "", "detail": ""}})
+        _rows, audit, error = checker.check_dependencies(
+            npm=fake_npm("", failed, outdated_rc=0, audit_rc=1)
+        )
+        self.assertIn("ECONNREFUSED", error)
+
+    def test_outdated_error_payload_is_not_treated_as_a_package(self):
+        failed = json.dumps({"error": {"code": "ENOTFOUND", "summary": "registry unreachable"}})
+        rows, _audit, error = checker.check_dependencies(
+            npm=fake_npm(failed, AUDIT_CLEAN, outdated_rc=1)
+        )
+        self.assertEqual(rows, [])
+        self.assertIn("registry unreachable", error)
 
 
 class RenderTests(unittest.TestCase):

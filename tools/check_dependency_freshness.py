@@ -38,6 +38,12 @@ def release_key(version: str) -> list[int] | None:
     return [int(part) for part in match.group(0).split(".")] if match else None
 
 
+def has_prerelease(version: str) -> bool:
+    text = str(version).strip().split("+", 1)[0]
+    match = RELEASE_PATTERN.match(text)
+    return bool(match) and text[match.end():].startswith("-")
+
+
 def is_newer(candidate: str, reference: str) -> bool:
     left, right = release_key(candidate), release_key(reference)
     if left is None or right is None:
@@ -47,7 +53,20 @@ def is_newer(candidate: str, reference: str) -> bool:
         b = right[index] if index < len(right) else 0
         if a != b:
             return a > b
-    return False
+    # Same release numbers: a stable release is newer than its own pre-release.
+    # (Two different pre-releases are not ordered; that is left to assessment.)
+    return has_prerelease(reference) and not has_prerelease(candidate)
+
+
+def payload_error(payload: object) -> str:
+    """Return npm's own failure text when a payload is an error, not a result."""
+    if not isinstance(payload, dict):
+        return ""
+    error = payload.get("error")
+    if not isinstance(error, dict):
+        return ""
+    parts = [payload.get("message"), error.get("summary"), error.get("detail"), error.get("code")]
+    return "; ".join(str(part).strip() for part in parts if part and str(part).strip()) or "npm reported an error"
 
 
 def normalize_outdated(outdated: dict) -> list[dict]:
@@ -147,7 +166,11 @@ def check_dependencies(cwd: Path = ROOT, npm=run_npm) -> tuple[list[dict], dict,
     else:
         try:
             payload = json.loads(outdated_result.stdout) if outdated_result.stdout.strip() else {}
-            rows = normalize_outdated(payload)
+            failure = payload_error(payload)
+            if failure:
+                errors.append(f"npm outdated failed: {failure}")
+            else:
+                rows = normalize_outdated(payload)
         except json.JSONDecodeError as error:
             errors.append(f"Cannot parse npm outdated: {error}")
 
@@ -158,7 +181,12 @@ def check_dependencies(cwd: Path = ROOT, npm=run_npm) -> tuple[list[dict], dict,
         )
     else:
         try:
-            audit = normalize_audit(json.loads(audit_result.stdout))
+            audit_payload = json.loads(audit_result.stdout)
+            failure = payload_error(audit_payload)
+            if failure:
+                errors.append(f"npm audit failed: {failure}")
+            else:
+                audit = normalize_audit(audit_payload)
         except json.JSONDecodeError as error:
             errors.append(f"Cannot parse npm audit: {error}")
 
