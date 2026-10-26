@@ -127,6 +127,28 @@ EOF
 chmod +x "$STUB/codex"
 run env PATH="$STUB:/usr/bin:/bin" $SH "$S" "$W/sample.py" --rubric code --timeout 1
 chk "Codex review 呼叫逾時" failed_timeout 2 "$ST" "$RC"
+# 沒有 GNU coreutils timeout（例如 macOS）時走 POSIX watchdog。排除方式：PATH 最前面放一支
+# 不是 coreutils 的假 timeout（--version 沒有 coreutils 字樣），腳本就會退回 watchdog；
+# 假 timeout 若被當成逾時工具實際呼叫會留下標記，用來證明走的真的是 watchdog。
+NOCORE="$W/nocore"; mkdir -p "$NOCORE"
+cat >"$NOCORE/timeout" <<EOF2
+#!/bin/sh
+[ "\$1" = "--version" ] && { echo "not-gnu 0.0"; exit 0; }
+: >"$W/fake-timeout-used"
+exit 99
+EOF2
+chmod +x "$NOCORE/timeout"
+rm -f "$W/fake-timeout-used"
+run env PATH="$NOCORE:/usr/bin:/bin" AI_REVIEW_CMD='cat' $SH "$S" "$W/sample.py" --rubric code --no-save
+chk "watchdog：prompt 仍從 stdin 送達後端" ok 0 "$ST" "$RC"
+if printf '%s' "$OUT" | grep -q 'return a-b'; then
+	ok_ "watchdog：後端收到的 prompt 含來源內容"
+else
+	no_ "watchdog：後端收到空 stdin（prompt 被丟失）"
+fi
+[ -f "$W/fake-timeout-used" ] && no_ "watchdog：測試前提不成立（假 timeout 被呼叫）" || ok_ "watchdog：確實走 POSIX watchdog 而非 coreutils timeout"
+run env PATH="$NOCORE:/usr/bin:/bin" AI_REVIEW_CMD='sleep 5; printf should_not_finish' $SH "$S" "$W/sample.py" --rubric code --timeout 1
+chk "watchdog：逾時仍判 failed_timeout" failed_timeout 2 "$ST" "$RC"
 
 echo "-- D. 呼叫鏈：降級不得中斷上層 --"
 cat >"$W/chain.sh" <<EOF

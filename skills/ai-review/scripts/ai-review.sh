@@ -167,8 +167,12 @@ run_bounded() {
 
 	_rb_marker="$TMPD/timed-out"
 	rm -f "$_rb_marker"
-	"$@" &
+	# 非互動 shell 的背景命令 stdin 預設是 /dev/null，會吃掉 `< "$PROMPT_FILE"`，
+	# 後端讀到空 prompt（failed_empty）。先複製 stdin 再明確導回去。
+	exec 3<&0
+	"$@" <&3 &
 	_rb_command_pid=$!
+	exec 3<&-
 	(
 		sleep "$_rb_seconds"
 		if kill -0 "$_rb_command_pid" 2>/dev/null; then
