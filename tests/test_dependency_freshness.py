@@ -141,6 +141,15 @@ class CheckDependenciesTests(unittest.TestCase):
         self.assertEqual(rows, [])
         self.assertIn("registry unreachable", error)
 
+    def test_a_package_named_error_is_still_a_package(self):
+        outdated = json.dumps({
+            "error": {"current": "1.0.0", "wanted": "1.0.0", "latest": "2.0.0", "type": "dependencies"},
+            "skills": {"current": "1.5.23", "wanted": "1.5.23", "latest": "1.6.0", "type": "devDependencies"},
+        })
+        rows, _audit, error = checker.check_dependencies(npm=fake_npm(outdated, AUDIT_CLEAN))
+        self.assertEqual(error, "")
+        self.assertEqual([row["name"] for row in rows], ["error", "skills"])
+
 
 class RenderTests(unittest.TestCase):
     def test_clean_report_says_so(self):

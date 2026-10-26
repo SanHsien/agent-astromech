@@ -147,6 +147,17 @@ else
 	no_ "watchdog：後端收到空 stdin（prompt 被丟失）"
 fi
 [ -f "$W/fake-timeout-used" ] && no_ "watchdog：測試前提不成立（假 timeout 被呼叫）" || ok_ "watchdog：確實走 POSIX watchdog 而非 coreutils timeout"
+# 呼叫端把 stdin 關掉（cron、部分 CI）時，watchdog 路徑仍須走完並印出狀態行，不得整支中止。
+cat >"$STUB/codex" <<'EOF2'
+#!/bin/sh
+[ "$1 $2" = "login status" ] && { echo "Logged in"; exit 0; }
+echo "stream error: 429 Too Many Requests" >&2
+exit 1
+EOF2
+chmod +x "$STUB/codex"
+OUT=$(env PATH="$NOCORE:$STUB:/usr/bin:/bin" $SH "$S" "$W/sample.py" --rubric code --no-save 2>/dev/null <&-); RC=$?
+ST=$(printf '%s' "$OUT" | sed -n 's/^AI_REVIEW_STATUS: //p' | tail -1)
+chk "watchdog：stdin 關閉仍印出狀態" failed_quota 2 "$ST" "$RC"
 run env PATH="$NOCORE:/usr/bin:/bin" AI_REVIEW_CMD='sleep 5; printf should_not_finish' $SH "$S" "$W/sample.py" --rubric code --timeout 1
 chk "watchdog：逾時仍判 failed_timeout" failed_timeout 2 "$ST" "$RC"
 

@@ -169,10 +169,9 @@ run_bounded() {
 	rm -f "$_rb_marker"
 	# 非互動 shell 的背景命令 stdin 預設是 /dev/null，會吃掉 `< "$PROMPT_FILE"`，
 	# 後端讀到空 prompt（failed_empty）。先複製 stdin 再明確導回去。
-	exec 3<&0
-	"$@" <&3 &
+	# 重導向放在複合命令上：stdin 已關閉時只是這個命令失敗，不會像 `exec` 那樣直接結束整支腳本。
+	{ "$@" <&3 3<&- & } 3<&0
 	_rb_command_pid=$!
-	exec 3<&-
 	(
 		sleep "$_rb_seconds"
 		if kill -0 "$_rb_command_pid" 2>/dev/null; then
@@ -457,7 +456,7 @@ else
 	LOGIN_TIMEOUT=$TIMEOUT_SECONDS
 	[ "$LOGIN_TIMEOUT" -le 15 ] || LOGIN_TIMEOUT=15
 	LOGIN_RC=0
-	run_bounded "$LOGIN_TIMEOUT" "$CODEX" login status >"$LOGIN_OUT" 2>&1 || LOGIN_RC=$?
+	run_bounded "$LOGIN_TIMEOUT" "$CODEX" login status </dev/null >"$LOGIN_OUT" 2>&1 || LOGIN_RC=$?
 	if [ "$LOGIN_RC" -eq 124 ]; then
 		guide failed_timeout
 		printf '── codex login status ──\n' >&2

@@ -54,7 +54,7 @@ def is_newer(candidate: str, reference: str) -> bool:
         if a != b:
             return a > b
     # Same release numbers: a stable release is newer than its own pre-release.
-    # (Two different pre-releases are not ordered; that is left to assessment.)
+    # (Two different pre-releases are not ordered here, so they compare as equal.)
     return has_prerelease(reference) and not has_prerelease(candidate)
 
 
@@ -64,6 +64,10 @@ def payload_error(payload: object) -> str:
         return ""
     error = payload.get("error")
     if not isinstance(error, dict):
+        return ""
+    # `npm outdated` keys its payload by package name, and a package really can
+    # be called "error"; its row carries version fields, a failure does not.
+    if {"current", "wanted", "latest"} & set(error):
         return ""
     parts = [payload.get("message"), error.get("summary"), error.get("detail"), error.get("code")]
     return "; ".join(str(part).strip() for part in parts if part and str(part).strip()) or "npm reported an error"
