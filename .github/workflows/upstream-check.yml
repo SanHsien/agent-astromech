@@ -1,3 +1,4 @@
+# fleet-waiver: upstream_tool -- own design: reads tools/upstream_baseline.json schema v1 (schema_version, upstream, reviewed_branches), lists tickets with `gh api --paginate --slurp` (never truncated) and prints only numbers (no titles to mis-encode); exit codes already 0/1/2
 name: Upstream check
 
 on:
