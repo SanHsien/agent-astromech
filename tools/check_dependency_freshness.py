@@ -63,6 +63,10 @@ def payload_error(payload: object) -> str:
     if not isinstance(payload, dict):
         return ""
     error = payload.get("error")
+    if isinstance(error, str):
+        message = payload.get("message")
+        parts = [message, error] if message and message != error else [error]
+        return "; ".join(str(part).strip() for part in parts if part and str(part).strip()) or "npm reported an error"
     if not isinstance(error, dict):
         return ""
     # `npm outdated` keys its payload by package name, and a package really can
@@ -88,7 +92,11 @@ def normalize_outdated(outdated: dict) -> list[dict]:
 
 
 def normalize_audit(audit: dict) -> dict:
-    counts = (audit or {}).get("metadata", {}).get("vulnerabilities", {})
+    if not isinstance(audit, dict) or "metadata" not in audit or not isinstance(audit["metadata"], dict):
+        raise ValueError("npm audit payload is missing metadata")
+    counts = audit["metadata"].get("vulnerabilities", {})
+    if not isinstance(counts, dict):
+        raise ValueError("npm audit payload is missing vulnerabilities metadata")
     return {name: int(counts.get(name, 0) or 0) for name in SEVERITIES}
 
 
@@ -193,6 +201,8 @@ def check_dependencies(cwd: Path = ROOT, npm=run_npm) -> tuple[list[dict], dict,
                 audit = normalize_audit(audit_payload)
         except json.JSONDecodeError as error:
             errors.append(f"Cannot parse npm audit: {error}")
+        except ValueError as error:
+            errors.append(f"npm audit failed: {error}")
 
     return rows, audit, "; ".join(part for part in errors if part)
 

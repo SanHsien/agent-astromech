@@ -150,6 +150,26 @@ class CheckDependenciesTests(unittest.TestCase):
         self.assertEqual(error, "")
         self.assertEqual([row["name"] for row in rows], ["error", "skills"])
 
+    def test_audit_missing_metadata_produces_check_error_not_zero(self):
+        missing_metadata = json.dumps({"vulnerabilities": {}})
+        _rows, _audit, error = checker.check_dependencies(
+            npm=fake_npm("", missing_metadata, outdated_rc=0, audit_rc=0)
+        )
+        self.assertTrue(error)
+        self.assertIn("missing metadata", error)
+
+    def test_audit_error_as_string_produces_check_error_not_zero(self):
+        string_error = json.dumps({"error": "audit registry unavailable"})
+        _rows, _audit, error = checker.check_dependencies(
+            npm=fake_npm("", string_error, outdated_rc=0, audit_rc=1)
+        )
+        self.assertTrue(error)
+        self.assertIn("audit registry unavailable", error)
+
+    def test_normalize_audit_missing_metadata_raises(self):
+        with self.assertRaises(ValueError):
+            checker.normalize_audit({})
+
 
 class RenderTests(unittest.TestCase):
     def test_clean_report_says_so(self):

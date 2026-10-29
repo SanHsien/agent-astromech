@@ -10,7 +10,6 @@
 ## 近期：可以直接動手
 | 項目 | 為什麼 | 驗收方式 | 建議執行者 | 證據 |
 | --- | --- | --- | --- | --- |
-| `normalize_audit` 對缺 `metadata` 的 npm audit 輸出改為失敗 | 現行 `tools/check_dependency_freshness.py:90` 缺 metadata 時回 0 漏洞；已知 npm 形狀已被擋，但非 dict 形狀的 error 仍會被當成 0（同類假綠的剩餘缺口） | `tests/` 新增：缺 `metadata`、`error` 為字串兩種輸入都產生 check_error 而非 0；`pwsh -NoProfile -File tools\dev_check.ps1` 綠 | Claude Sonnet | `tools/check_dependency_freshness.py:90`；深掃報告（2026-10-26）「刻意不修／觀察」 |
 | 為 `ai-review` 的 `AI_REVIEW_CMD` 逾時改為連孫行程一起終止，或在 `SKILL.md` 明寫限制 | 目前逾時只殺 `sh -c`，孫行程可能殘留；使用者看不到這個限制 | 二擇一：(a) matrix 新增「逾時後無殘留行程」情境且 Linux CI 綠；(b) `skills/ai-review/SKILL.md` 與 `docs/TEST_PLAN.md` 寫明並由 contract checker 釘住；Windows `dev_check.ps1` 同樣綠 | Claude Opus | 深掃報告（2026-10-26）「刻意不修／觀察」；`skills/ai-review/` |
 
 ## 中期：等條件成立再做
