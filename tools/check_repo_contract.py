@@ -162,6 +162,20 @@ def validate(root: Path) -> list[str]:
     if harvester.is_file() and "os.uname(" in harvester.read_text(encoding="utf-8"):
         errors.append("mission-log harvester must not use os.uname() on Windows")
 
+    ai_review_skill = root / "skills/ai-review/SKILL.md"
+    if ai_review_skill.is_file():
+        skill_text = ai_review_skill.read_text(encoding="utf-8")
+        for phrase in ("孫行程可能殘留",):
+            if phrase not in skill_text:
+                errors.append(f"ai-review SKILL.md is missing timeout boundary: {phrase}")
+
+    test_plan = root / "docs/TEST_PLAN.md"
+    if test_plan.is_file():
+        test_plan_text = test_plan.read_text(encoding="utf-8")
+        for phrase in ("孫行程可能殘留",):
+            if phrase not in test_plan_text:
+                errors.append(f"TEST_PLAN.md is missing timeout boundary: {phrase}")
+
     attributes = root / ".gitattributes"
     if attributes.is_file() and "* text=auto eol=lf" not in attributes.read_text(encoding="utf-8"):
         errors.append(".gitattributes must normalize text to LF")

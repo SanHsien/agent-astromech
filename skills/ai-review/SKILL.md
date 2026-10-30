@@ -126,13 +126,14 @@ AI_REVIEW_CMD='ollama run llama3' ./scripts/ai-review.sh draft.md --rubric copy
 後端跑不起來（找不到命令、沒有執行權限）或它自己說沒登入時，一樣走 `skipped_*`＋exit 0，
 不會中斷你的流程。
 
-⚠️ 三個代價講在前面：
+⚠️ 四個代價講在前面：
 ① 自帶後端的品質不可控，而 rubric 的措辭是為「另一個模型家族」寫的；
 ② `AI_REVIEW_CMD` 是**整條 shell 命令**（用 `sh -c` 執行），不是單純的執行檔路徑 ——
 別讓不可信的來源（外部 `.env`、CI 變數）決定它的值；
 ③ 若你的後端把錯誤訊息印到 **stdout** 而且回 exit 0，本工具分不出那是意見還是錯誤頁，
 只會用長度給你一個「偏短」的警告 —— 自訂後端時自己看一眼輸出。
 （後端回**非零**時不受此限：stderr 與 stdout 都會納入分類並照印。）
+④ 逾時終止：有 GNU coreutils `timeout` 時會終止整個行程群組，但脫離群組（`setsid`、daemon）或 Windows 原生子行程仍可能殘留；沒有 coreutils（如 macOS）時退回內建 watchdog，只殺 `sh -c`／後端本身，其子行程與孫行程可能殘留，需自行處理行程生命週期。
 另外三個環境變數：`AI_REVIEW_DIR`（落檔目錄，預設 `./.ai-reviews`）、
 `AI_REVIEW_RUBRICS`（自訂 rubric 目錄）、`AI_REVIEW_TIMEOUT_SECONDS`（預設 600；CLI 的 `--timeout` 優先）。
 ⚠️ 落檔會把**送審內容的審閱結果**留在磁碟上。檔案以 `600` 建立（只有你讀得到），

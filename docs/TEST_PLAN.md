@@ -489,6 +489,8 @@ skill 層三項行為皆正確、damage-report 整合節可達）。
 
 **通過**：自訂後端、Codex 登入檢查與 Codex review 三條 stub 路徑睡眠超過一秒時皆回 `failed_timeout`＋exit 2；timeout 非正整數在後端啟動前回 exit 1。狀態（2026-08-24）：✅ Windows Git Bash 已納入矩陣（現為 46 項）；Linux 5-shell 由 exact-SHA CI 驗證。
 
+⚠️ **已知邊界限制**：逾時在 coreutils `timeout` 下終止整個行程群組；無 coreutils 時退回 watchdog，只殺 `sh -c` 或後端本身，子行程與孫行程可能殘留（脫離群組者在兩種模式下都可能殘留）。已在 `skills/ai-review/SKILL.md` 註記。
+
 ### E-05 ✋ 平台與方案覆蓋
 
 >（編號跳序＝歷史演進痕跡，刻意保留：E-05 性質是收尾總查，物理位置固定在 E-09 之後，編號不重排。）

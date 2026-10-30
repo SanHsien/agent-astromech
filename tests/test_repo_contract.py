@@ -88,6 +88,30 @@ class RepoContractTests(unittest.TestCase):
                 MODULE.validate(copy),
             )
 
+    def test_ai_review_timeout_process_boundary_is_enforced(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            copy = Path(directory) / "repo"
+            shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+            path = copy / "skills" / "ai-review" / "SKILL.md"
+            text = path.read_text(encoding="utf-8").replace("孫行程可能殘留", "")
+            path.write_text(text, encoding="utf-8")
+            self.assertIn(
+                "ai-review SKILL.md is missing timeout boundary: 孫行程可能殘留",
+                MODULE.validate(copy),
+            )
+
+    def test_test_plan_timeout_process_boundary_is_enforced(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            copy = Path(directory) / "repo"
+            shutil.copytree(ROOT, copy, ignore=shutil.ignore_patterns(".git", "__pycache__"))
+            path = copy / "docs" / "TEST_PLAN.md"
+            text = path.read_text(encoding="utf-8").replace("孫行程可能殘留", "")
+            path.write_text(text, encoding="utf-8")
+            self.assertIn(
+                "TEST_PLAN.md is missing timeout boundary: 孫行程可能殘留",
+                MODULE.validate(copy),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()

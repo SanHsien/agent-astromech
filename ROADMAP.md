@@ -10,7 +10,6 @@
 ## 近期：可以直接動手
 | 項目 | 為什麼 | 驗收方式 | 建議執行者 | 證據 |
 | --- | --- | --- | --- | --- |
-| 為 `ai-review` 的 `AI_REVIEW_CMD` 逾時改為連孫行程一起終止，或在 `SKILL.md` 明寫限制 | 目前逾時只殺 `sh -c`，孫行程可能殘留；使用者看不到這個限制 | 二擇一：(a) matrix 新增「逾時後無殘留行程」情境且 Linux CI 綠；(b) `skills/ai-review/SKILL.md` 與 `docs/TEST_PLAN.md` 寫明並由 contract checker 釘住；Windows `dev_check.ps1` 同樣綠 | Claude Opus | 深掃報告（2026-10-26）「刻意不修／觀察」；`skills/ai-review/` |
 
 ## 中期：等條件成立再做
 | 項目 | 觸發條件 | 驗收方式 | 建議執行者 | 證據 |
