@@ -38,10 +38,36 @@ def release_key(version: str) -> list[int] | None:
     return [int(part) for part in match.group(0).split(".")] if match else None
 
 
-def has_prerelease(version: str) -> bool:
+def prerelease_parts(version: str) -> list[str] | None:
+    """Pre-release identifiers of a version, or None for a stable release.
+
+    Build metadata (after ``+``) never takes part in precedence.
+    """
     text = str(version).strip().split("+", 1)[0]
     match = RELEASE_PATTERN.match(text)
-    return bool(match) and text[match.end():].startswith("-")
+    if not match or not text[match.end():].startswith("-"):
+        return None
+    return text[match.end() + 1:].split(".")
+
+
+def has_prerelease(version: str) -> bool:
+    return prerelease_parts(version) is not None
+
+
+def _compare_prerelease(left: list[str], right: list[str]) -> int:
+    """SemVer 2.0.0 section 11.4: compare dot-separated identifiers left to right."""
+    for a, b in zip(left, right):
+        if a == b:
+            continue
+        a_num, b_num = a.isdigit(), b.isdigit()
+        if a_num and b_num:
+            return (int(a) > int(b)) - (int(a) < int(b))
+        if a_num != b_num:
+            # Numeric identifiers always have lower precedence than alphanumeric ones.
+            return -1 if a_num else 1
+        return (a > b) - (a < b)
+    # All shared identifiers equal: the larger set of fields wins.
+    return (len(left) > len(right)) - (len(left) < len(right))
 
 
 def is_newer(candidate: str, reference: str) -> bool:
@@ -53,9 +79,12 @@ def is_newer(candidate: str, reference: str) -> bool:
         b = right[index] if index < len(right) else 0
         if a != b:
             return a > b
-    # Same release numbers: a stable release is newer than its own pre-release.
-    # (Two different pre-releases are not ordered here, so they compare as equal.)
-    return has_prerelease(reference) and not has_prerelease(candidate)
+    # Same release numbers: a stable release is newer than its own pre-release,
+    # and two pre-releases are ordered by their identifiers.
+    left_pre, right_pre = prerelease_parts(candidate), prerelease_parts(reference)
+    if left_pre is None or right_pre is None:
+        return right_pre is not None and left_pre is None
+    return _compare_prerelease(left_pre, right_pre) > 0
 
 
 def payload_error(payload: object) -> str:
@@ -163,6 +192,17 @@ def run_npm(args: list[str], cwd: Path = ROOT) -> subprocess.CompletedProcess:
     )
 
 
+def declares_dependencies(cwd: Path) -> bool:
+    try:
+        manifest = json.loads((cwd / "package.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    return isinstance(manifest, dict) and any(
+        isinstance(manifest.get(field), dict) and manifest[field]
+        for field in ("dependencies", "devDependencies", "optionalDependencies")
+    )
+
+
 def check_dependencies(cwd: Path = ROOT, npm=run_npm) -> tuple[list[dict], dict, str]:
     # `npm outdated` exits 1 when anything is outdated and `npm audit` exits 1
     # when it finds a vulnerability. Both are results, not failures.
@@ -183,6 +223,12 @@ def check_dependencies(cwd: Path = ROOT, npm=run_npm) -> tuple[list[dict], dict,
                 errors.append(f"npm outdated failed: {failure}")
             else:
                 rows = normalize_outdated(payload)
+                if not rows and declares_dependencies(cwd) and not (cwd / "node_modules").is_dir():
+                    # Without an install npm outdated answers {} and exit 0 without
+                    # ever asking the registry: nothing was checked.
+                    errors.append(
+                        "npm outdated checked nothing: node_modules is missing (run `npm ci` first)"
+                    )
         except json.JSONDecodeError as error:
             errors.append(f"Cannot parse npm outdated: {error}")
 

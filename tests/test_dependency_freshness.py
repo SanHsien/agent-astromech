@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import tempfile
 import unittest
 from pathlib import Path
 
@@ -69,6 +70,32 @@ class StatusTests(unittest.TestCase):
         row = {"current": "2.0.0", "wanted": "2.0.0", "latest": "2.0.0-rc.1"}
         self.assertFalse(checker.needs_maintenance(row))
 
+    def test_older_prerelease_behind_newer_prerelease_is_maintenance(self):
+        # Review F-5: rc.1 sits behind rc.2. Calling it "ahead" mislabels the row
+        # and mutes it, which is the opposite of what happened.
+        row = {"current": "2.0.0-rc.1", "wanted": "2.0.0-rc.1", "latest": "2.0.0-rc.2"}
+        self.assertEqual(checker.status_for(row), "Newer release to assess")
+        self.assertTrue(checker.needs_maintenance(row))
+
+    def test_newer_prerelease_ahead_of_older_prerelease_stays_quiet(self):
+        row = {"current": "2.0.0-rc.2", "wanted": "2.0.0-rc.2", "latest": "2.0.0-rc.1"}
+        self.assertEqual(checker.status_for(row), "Ahead of dist-tag latest")
+        self.assertFalse(checker.needs_maintenance(row))
+
+    def test_prerelease_precedence_follows_semver_section_11(self):
+        # The ordered example from SemVer 2.0.0 section 11, plus numeric vs
+        # lexical (rc.10 after rc.2) and build metadata being ignored.
+        ordered = [
+            "1.0.0-alpha", "1.0.0-alpha.1", "1.0.0-alpha.beta", "1.0.0-beta",
+            "1.0.0-beta.2", "1.0.0-beta.11", "1.0.0-rc.1", "1.0.0-rc.2",
+            "1.0.0-rc.10", "1.0.0",
+        ]
+        for older, newer in zip(ordered, ordered[1:]):
+            with self.subTest(older=older, newer=newer):
+                self.assertTrue(checker.is_newer(newer, older))
+                self.assertFalse(checker.is_newer(older, newer))
+        self.assertFalse(checker.is_newer("1.0.0-rc.1+build.2", "1.0.0-rc.1+build.1"))
+
 
 class DeferralTests(unittest.TestCase):
     def test_deferral_silences_the_exact_version_it_was_judged_against(self):
@@ -117,12 +144,34 @@ class CheckDependenciesTests(unittest.TestCase):
         _rows, _audit, error = checker.check_dependencies(npm=fake_npm("not json", AUDIT_CLEAN))
         self.assertIn("Cannot parse npm outdated", error)
 
+    def project(self, installed: bool) -> Path:
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        root = Path(tmp.name)
+        (root / "package.json").write_text(json.dumps({"devDependencies": {"skills": "1.5.23"}}), encoding="utf-8")
+        if installed:
+            (root / "node_modules").mkdir()
+        return root
+
     def test_empty_stdout_means_nothing_outdated(self):
         rows, _audit, error = checker.check_dependencies(
-            npm=fake_npm("", AUDIT_CLEAN, outdated_rc=0)
+            cwd=self.project(installed=True), npm=fake_npm("", AUDIT_CLEAN, outdated_rc=0)
         )
         self.assertEqual(rows, [])
         self.assertEqual(error, "")
+
+    def test_missing_node_modules_is_reported_unchecked_not_current(self):
+        # Review F-6: without node_modules, npm outdated answers {} with exit 0
+        # and never asks the registry. That is "not checked", not "current".
+        root = self.project(installed=False)
+        rows, audit, error = checker.check_dependencies(
+            cwd=root, npm=fake_npm("{}", AUDIT_CLEAN, outdated_rc=0)
+        )
+        self.assertEqual(rows, [])
+        self.assertIn("node_modules", error)
+        report = checker.render_markdown(rows, audit, error)
+        self.assertNotIn("Everything is current", report)
+        self.assertIn("Check failed", report)
 
     def test_audit_that_could_not_reach_the_registry_is_not_reported_clean(self):
         # npm audit exits 1 with {"message", "error"} and no metadata when the
