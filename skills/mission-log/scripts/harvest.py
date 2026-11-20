@@ -11,6 +11,8 @@
 #   不能用固定倍率還原)。做法:按 message.id 併成一則(沒 id 的行用 requestId 併回唯一對到的那則;兩個都沒有
 #   才逐行各算一則),四欄各取最大;turns = 回應數(含 0 token 的 <synthetic>);跨午夜的回應整則歸它時間戳最早
 #   那行的那天(兩趟掃描:先整檔求每則回應的最早時間戳,再歸日——不依賴檔案行序),翌日不重算。
+# - 🔴 跨檔也只算一次:resume／continue 會把舊訊息(同 message.id)複寫進新 session 檔。同一個 id 歸最早
+#   出現的那個檔(同時間取檔名排序在前者)與那天,其他檔的副本整行不算、只把用量併過去取最大。
 # - 🔴 沒見過的形狀不硬加、要回報:同 id 出現兩組都非零且不相等的 input/cache、同 id 對到兩個 requestId、
 #   同一個 requestId 對到兩個以上(非 synthetic 的)id ⇒ 該則標矛盾:turns 照算、tokens 不計入、
 #   session 記 usage_conflict、stderr 警告。取最大會拼出從沒存在過的用量,寧可擋。
@@ -200,10 +202,28 @@ def harvest(projects_dir, day, timezone=None):
     day_end = day_start + datetime.timedelta(days=1)
     sessions = {}
     bad_ts = bad_usage = conflicts = 0
+    # 第一趟(全部檔案):每檔的回應索引,以及每個 message.id 跨檔最早出現在哪個檔、哪個時間。
+    # resume／continue 會把舊訊息(同 message.id)複寫進新 session 檔;同一則回應跨檔只算一次,
+    # 歸最早出現的那個檔與那天(同時間取檔名排序在前者),其他檔的副本只把用量併過去(取最大)。
+    indexes = []
+    id_owner = {}  # message.id → (最早 ts, 檔案序號)
     for tx in sorted(glob.glob(os.path.join(projects_dir, '*', '*.jsonl'))):
         try:
             with open(tx, encoding='utf-8', errors='replace') as fh:
-                req2ids, key_of, first_ts = response_index(fh, timezone)
+                index = response_index(fh, timezone)
+        except OSError:
+            continue
+        fileno = len(indexes)
+        indexes.append((tx, index))
+        for k, ts in index[2].items():
+            if k[0] == 'id':
+                cur = id_owner.get(k[1])
+                if cur is None or ts < cur[0]:
+                    id_owner[k[1]] = (ts, fileno)
+    files = []     # 第二趟每檔的結果:(s, resp, req2ids)
+    foreign = {}   # 檔案序號 → 別檔裡屬於它的回應副本 [(m, rq, rkey)]
+    for fileno, (tx, (req2ids, key_of, first_ts)) in enumerate(indexes):
+        try:
             fh = open(tx, encoding='utf-8', errors='replace')
         except OSError:
             continue
@@ -221,9 +241,17 @@ def harvest(projects_dir, day, timezone=None):
                     continue
                 rkey = key_of(mid, rq, lineno) if has_usage else None
                 if rkey is not None:
-                    owner = first_ts.get(rkey, ts)
+                    owner_file = fileno
+                    if rkey[0] == 'id' and rkey[1] in id_owner:
+                        owner, owner_file = id_owner[rkey[1]]
+                    else:
+                        owner = first_ts.get(rkey, ts)
                     if not day_start <= owner < day_end:
                         continue  # 這行屬於別天開始的回應,整行(含工具)歸那天
+                    if owner_file != fileno:
+                        # 別檔先出現過的回應(resume 複寫的副本):整行不算在本檔,用量併回原檔那則
+                        foreign.setdefault(owner_file, []).append((m, rq, rkey))
+                        continue
                     if not day_start <= ts < day_end:
                         spill.append((m, rq, rkey))
                         continue
@@ -251,6 +279,15 @@ def harvest(projects_dir, day, timezone=None):
         if s is not None:
             for m, rq, rkey in spill:
                 bad_usage += account_assistant(s, m, rq, resp, rkey)
+        files.append((fileno, s, resp, req2ids))
+    for fileno, s, resp, req2ids in files:
+        if s is not None:
+            for m, rq, rkey in foreign.get(fileno, ()):
+                vals = usage_vals(m['usage'])
+                if vals is None:
+                    bad_usage += 1
+                else:
+                    merge_response(resp, rkey, vals, rq)
             mark_conflicts(resp, req2ids)
             for e in resp.values():
                 s['turns'] += 1

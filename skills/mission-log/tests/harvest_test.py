@@ -332,6 +332,42 @@ class HarvestTest(unittest.TestCase):
                 self.assertEqual([(r['turns'], r['tokens'], r['first']) for r in d6],
                                  [(1, 10 + 2 + 3, '00:05')])
 
+    def test_response_copied_into_resumed_session_counted_once(self):
+        # Review F-8: resuming a session copies earlier messages (same message.id) into the new file.
+        # The response must be counted once across files: in the session where it first appeared,
+        # on its earliest day, with the max usage; the resumed file keeps only its own responses.
+        original = asst_line('2026-01-05T04:00:00Z', usage(5), mid='msg_A', req='req_1',
+                             tools=[{'type': 'tool_use', 'name': 'Bash'}])
+        self.write_session('proj-a', 'nnnn0001', [
+            original,
+            asst_line('2026-01-05T04:00:01Z', usage(30), mid='msg_A', req='req_1'),
+        ])
+        self.write_session('proj-a', 'nnnn0002', [
+            original,  # copied by resume
+            asst_line('2026-01-05T04:00:02Z', usage(70), mid='msg_A', req='req_1'),
+            asst_line('2026-01-05T05:00:00Z', usage(2), mid='msg_B', req='req_2'),
+        ])
+        rows = {r['session']: r for r in self.rows(self.run_harvest())}
+        self.assertEqual((rows['nnnn0001']['turns'], rows['nnnn0001']['tokens'], rows['nnnn0001']['tools']),
+                         (1, 10 + 70 + 3, {'Bash': 1}))
+        self.assertEqual((rows['nnnn0002']['turns'], rows['nnnn0002']['tokens'], rows['nnnn0002']['tools']),
+                         (1, 10 + 2 + 3, {}))
+        self.assertEqual(sum(r['usage_conflict'] for r in rows.values()), 0)
+
+    def test_copied_response_stays_on_its_earliest_day_across_files(self):
+        # The copy in the resumed file must not move the response to (or repeat it on) the resume day.
+        self.write_session('proj-a', 'oooo0001', [
+            asst_line('2026-01-05T04:00:00Z', usage(5), mid='msg_A', req='req_1'),
+        ])
+        self.write_session('proj-a', 'oooo0002', [
+            asst_line('2026-01-06T04:00:00Z', usage(5), mid='msg_A', req='req_1'),
+            asst_line('2026-01-06T04:05:00Z', usage(2), mid='msg_B', req='req_2'),
+        ])
+        d5 = self.rows(self.run_harvest('2026-01-05'))
+        self.assertEqual([(r['session'], r['turns']) for r in d5], [('oooo0001', 1)])
+        d6 = self.rows(self.run_harvest('2026-01-06'))
+        self.assertEqual([(r['session'], r['turns'], r['tokens']) for r in d6], [('oooo0002', 1, 10 + 2 + 3)])
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
