@@ -294,6 +294,44 @@ class HarvestTest(unittest.TestCase):
         self.assertEqual(d6[0]['first'], '00:05')
         self.assertEqual(d6[0]['tools'], {})
 
+    def test_requestid_only_continuation_not_recounted_next_day(self):
+        # Review F-1: the post-midnight continuation carries only requestId (no message.id). It must be
+        # absorbed into the response that started on 01-05 (output = max) and must not reappear on 01-06.
+        self.write_session('proj-a', 'mmmm0002', [
+            asst_line('2026-01-05T15:59:59Z', usage(5), mid='msg_A', req='req_1'),
+            asst_line('2026-01-05T16:00:03Z', usage(50), req='req_1'),
+            asst_line('2026-01-05T16:05:00Z', usage(2), mid='msg_B', req='req_2'),
+        ])
+        d5 = self.rows(self.run_harvest('2026-01-05'))
+        self.assertEqual(len(d5), 1)
+        self.assertEqual(d5[0]['turns'], 1)
+        self.assertEqual(d5[0]['tokens'], 10 + 50 + 3)
+        d6 = self.rows(self.run_harvest('2026-01-06'))
+        self.assertEqual(len(d6), 1)
+        self.assertEqual(d6[0]['turns'], 1)
+        self.assertEqual(d6[0]['tokens'], 10 + 2 + 3)
+
+    def test_midnight_straddle_independent_of_line_order(self):
+        # Review F-2: R-01 made the harvester independent of transcript order. A response that straddles
+        # midnight must land on its earliest day with the max output, whatever order its lines are written in.
+        import itertools
+        straddle = [
+            asst_line('2026-01-05T15:59:58Z', usage(5), mid='msg_A', req='req_1',
+                      tools=[{'type': 'tool_use', 'name': 'Bash'}]),
+            asst_line('2026-01-05T16:00:02Z', usage(40), mid='msg_A', req='req_1'),
+            asst_line('2026-01-05T16:00:03Z', usage(60), req='req_1'),
+        ]
+        tail = asst_line('2026-01-05T16:05:00Z', usage(2), mid='msg_B', req='req_2')
+        for order in itertools.permutations(range(3)):
+            with self.subTest(order=order):
+                self.write_session('proj-a', 'mmmm0003', [straddle[i] for i in order] + [tail])
+                d5 = self.rows(self.run_harvest('2026-01-05'))
+                self.assertEqual([(r['turns'], r['tokens'], r['tools']) for r in d5],
+                                 [(1, 10 + 60 + 3, {'Bash': 1})])
+                d6 = self.rows(self.run_harvest('2026-01-06'))
+                self.assertEqual([(r['turns'], r['tokens'], r['first']) for r in d6],
+                                 [(1, 10 + 2 + 3, '00:05')])
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

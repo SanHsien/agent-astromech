@@ -9,7 +9,8 @@
 # - 🔴 一則 API 回應只算一次:transcript 把同一則回應拆成多行(每個 content block 一行),每行都帶同一份
 #   usage,而 output_tokens 是串流累計快照——逐行相加會把 turns 與 tokens 灌水約 2 倍(實測每天 1.6~7 倍不等,
 #   不能用固定倍率還原)。做法:按 message.id 併成一則(沒 id 的行用 requestId 併回唯一對到的那則;兩個都沒有
-#   才逐行各算一則),四欄各取最大;turns = 回應數(含 0 token 的 <synthetic>);跨午夜的回應歸它第一行那天。
+#   才逐行各算一則),四欄各取最大;turns = 回應數(含 0 token 的 <synthetic>);跨午夜的回應整則歸它時間戳最早
+#   那行的那天(兩趟掃描:先整檔求每則回應的最早時間戳,再歸日——不依賴檔案行序),翌日不重算。
 # - 🔴 沒見過的形狀不硬加、要回報:同 id 出現兩組都非零且不相等的 input/cache、同 id 對到兩個 requestId、
 #   同一個 requestId 對到兩個以上(非 synthetic 的)id ⇒ 該則標矛盾:turns 照算、tokens 不計入、
 #   session 記 usage_conflict、stderr 警告。取最大會拼出從沒存在過的用量,寧可擋。
@@ -99,19 +100,12 @@ def merge_response(resp, key, vals, rq):
         elif rq != e['req'] and e['bad'] is None:
             e['bad'] = '同 id 對到兩個 requestId'
 
-def resolve_aliases(resp, req2ids):
-    """沒有 message.id 的行(key=('req', q)):q 唯一對到一個 id ⇒ 併進那則;對到多個 ⇒ 矛盾。
-    同一個 requestId 對到兩個以上非 synthetic 的 id ⇒ 那幾則都標矛盾。"""
-    for key in [k for k in resp if k[0] == 'req']:
-        ids = req2ids.get(key[1], set())
-        if len(ids) == 1:
-            e = resp.pop(key)
-            tgt = ('id', next(iter(ids)))
-            merge_response(resp, tgt, e['v'], e['req'])
-            if e['bad'] and resp[tgt]['bad'] is None:
-                resp[tgt]['bad'] = e['bad']
-        elif len(ids) > 1 and resp[key]['bad'] is None:
-            resp[key]['bad'] = 'requestId 對到多個 id'
+def mark_conflicts(resp, req2ids):
+    """沒有 message.id 的行若 requestId 對到多個 id(key 仍是 ('req', q))⇒ 矛盾;
+    同一個 requestId 對到兩個以上非 synthetic 的 id ⇒ 那幾則都標矛盾。唯一對到的,第一趟已併成同一個 key。"""
+    for key, e in resp.items():
+        if key[0] == 'req' and len(req2ids.get(key[1], ())) > 1 and e['bad'] is None:
+            e['bad'] = 'requestId 對到多個 id'
     for q, ids in req2ids.items():
         if len(ids) > 1:
             for mid in ids:
@@ -119,19 +113,17 @@ def resolve_aliases(resp, req2ids):
                 if e is not None and e['bad'] is None:
                     e['bad'] = 'requestId 對到多個 id'
 
-def account_assistant(s, obj, m, mid, rq, lineno, resp, req2ids):
-    """一行 assistant 訊息的 usage/模型/工具記進 session。回 1=usage 欄壞行(已略過),0=正常。"""
+def account_assistant(s, m, rq, resp, rkey):
+    """一行 assistant 訊息的 usage/模型/工具記進 session。rkey=這行所屬回應的 key(沒有 usage 時為 None)。
+    回 1=usage 欄壞行(已略過),0=正常。"""
     bad = 0
     u = m.get('usage')
-    if isinstance(u, dict):
+    if isinstance(u, dict) and rkey is not None:
         vals = usage_vals(u)
         if vals is None:
             bad = 1
         else:
-            key = ('id', mid) if mid else (('req', rq) if rq else ('line', lineno))
-            if mid and rq and m.get('model') != SYNTHETIC:
-                req2ids.setdefault(rq, set()).add(mid)
-            merge_response(resp, key, vals, rq)
+            merge_response(resp, rkey, vals, rq)
     model = m.get('model')
     if isinstance(model, str) and model and model != SYNTHETIC:
         s['models'].add(model)
@@ -145,6 +137,61 @@ def account_assistant(s, obj, m, mid, rq, lineno, resp, req2ids):
                 s['tools'][n] = s['tools'].get(n, 0) + 1
     return bad
 
+def scan_lines(fh, timezone):
+    """逐行產出 (lineno, obj, ts, m, mid, rq, has_usage);ts 為 False 表示有時間戳但解析不了。"""
+    for lineno, line in enumerate(fh, 1):
+        try:
+            obj = json.loads(line)
+        except Exception:
+            continue
+        if not isinstance(obj, dict):
+            continue
+        raw = obj.get('timestamp')
+        ts = parse_ts(raw, timezone) if raw else None
+        if raw and ts is None:
+            yield lineno, obj, False, None, None, None, False
+            continue
+        if not ts:
+            continue
+        m = obj.get('message')
+        if not isinstance(m, dict):
+            m = None
+        has_usage = m is not None and isinstance(m.get('usage'), dict)
+        mid = m.get('id') if has_usage else None
+        mid = mid if isinstance(mid, str) and mid else None
+        rq = obj.get('requestId')
+        rq = rq if isinstance(rq, str) and rq else None
+        yield lineno, obj, ts, m, mid, rq, has_usage
+
+def response_index(fh, timezone):
+    """第一趟(整檔、與行序無關):建 requestId → 非 synthetic message.id 對照,並求每則回應最早一行的時間戳。
+    回 (req2ids, key_of, first_ts)。key_of(mid, rq, lineno) 給一行所屬回應的 key:有 id 用 id;沒 id 但
+    requestId 唯一對到一個 id ⇒ 用那個 id;否則用 requestId;兩個都沒有 ⇒ 逐行各一則。"""
+    req2ids, id_first, req_first = {}, {}, {}
+    for _, _, ts, m, mid, rq, has_usage in scan_lines(fh, timezone):
+        if ts is False or not has_usage:
+            continue
+        if mid and rq and m.get('model') != SYNTHETIC:
+            req2ids.setdefault(rq, set()).add(mid)
+        if mid:
+            id_first[mid] = min(id_first.get(mid, ts), ts)
+        elif rq:
+            req_first[rq] = min(req_first.get(rq, ts), ts)
+
+    def key_of(mid, rq, lineno):
+        if mid:
+            return ('id', mid)
+        if rq:
+            ids = req2ids.get(rq, ())
+            return ('id', next(iter(ids))) if len(ids) == 1 else ('req', rq)
+        return ('line', lineno)
+
+    first_ts = {('id', mid): ts for mid, ts in id_first.items()}
+    for rq, ts in req_first.items():
+        k = key_of(None, rq, 0)
+        first_ts[k] = min(first_ts.get(k, ts), ts)
+    return req2ids, key_of, first_ts
+
 def harvest(projects_dir, day, timezone=None):
     if timezone:
         day_start = datetime.datetime.combine(day, datetime.time.min, tzinfo=timezone)
@@ -155,6 +202,8 @@ def harvest(projects_dir, day, timezone=None):
     bad_ts = bad_usage = conflicts = 0
     for tx in sorted(glob.glob(os.path.join(projects_dir, '*', '*.jsonl'))):
         try:
+            with open(tx, encoding='utf-8', errors='replace') as fh:
+                req2ids, key_of, first_ts = response_index(fh, timezone)
             fh = open(tx, encoding='utf-8', errors='replace')
         except OSError:
             continue
@@ -162,42 +211,24 @@ def harvest(projects_dir, day, timezone=None):
         full_sid = os.path.splitext(os.path.basename(tx))[0]
         key = (proj, full_sid)
         s = None
-        pre_ids = set()        # 當天開始前就出現過的回應 id:跨午夜的回應歸前一天,它今天的行整行不算
-        resp, req2ids = {}, {}  # 本檔當天的「一則回應」表 / requestId → 非 synthetic 的 message.id
+        # 一則回應整則歸「它最早一行」那天(first_ts 來自第一趟,與行序無關):跨午夜的後續行併回那天,翌日整行不算。
+        resp = {}    # 本檔歸當天的「一則回應」表
+        spill = []   # 歸當天、但時間戳落在當天之外的後續行:session 建好後再併(只計用量/模型/工具,不動 first/last)
         with fh:
-            for lineno, line in enumerate(fh, 1):
-                try:
-                    obj = json.loads(line)
-                except Exception:
+            for lineno, obj, ts, m, mid, rq, has_usage in scan_lines(fh, timezone):
+                if ts is False:
+                    bad_ts += 1  # 有時間戳但解析不了:計數
                     continue
-                if not isinstance(obj, dict):
+                rkey = key_of(mid, rq, lineno) if has_usage else None
+                if rkey is not None:
+                    owner = first_ts.get(rkey, ts)
+                    if not day_start <= owner < day_end:
+                        continue  # 這行屬於別天開始的回應,整行(含工具)歸那天
+                    if not day_start <= ts < day_end:
+                        spill.append((m, rq, rkey))
+                        continue
+                elif not day_start <= ts < day_end:
                     continue
-                raw = obj.get('timestamp')
-                ts = parse_ts(raw, timezone) if raw else None
-                if raw and ts is None:
-                    bad_ts += 1  # 有時間戳但解析不了:計數;解析失敗不可觸發下面的提早停止
-                    continue
-                if not ts:
-                    continue
-                m = obj.get('message')
-                if not isinstance(m, dict):
-                    m = None
-                has_usage = m is not None and isinstance(m.get('usage'), dict)
-                mid = m.get('id') if has_usage else None
-                mid = mid if isinstance(mid, str) and mid else None
-                rq = obj.get('requestId')
-                rq = rq if isinstance(rq, str) and rq else None
-                if ts < day_start:
-                    if mid:
-                        pre_ids.add(mid)
-                    continue
-                if ts >= day_end:
-                    # 跨午夜:同一則回應的後續行會落在當天終點之後——只吸收當天已開頭的那則
-                    if has_usage and s is not None and mid and ('id', mid) in resp:
-                        bad_usage += account_assistant(s, obj, m, mid, rq, lineno, resp, req2ids)
-                    continue
-                if mid and mid in pre_ids:
-                    continue  # 這行屬於前一天開始的回應,整行(含工具)歸那天
                 s = sessions.setdefault(key, {
                     'project': proj.split('-')[-1] or proj, 'session': full_sid,
                     'first': ts, 'last': ts, 'turns': 0, 'tokens': 0, 'usage_conflict': 0,
@@ -216,9 +247,11 @@ def harvest(projects_dir, day, timezone=None):
                     t = user_text(m)
                     if t:
                         s['prompts'].append(t[:70])
-                bad_usage += account_assistant(s, obj, m, mid, rq, lineno, resp, req2ids)
+                bad_usage += account_assistant(s, m, rq, resp, rkey)
         if s is not None:
-            resolve_aliases(resp, req2ids)
+            for m, rq, rkey in spill:
+                bad_usage += account_assistant(s, m, rq, resp, rkey)
+            mark_conflicts(resp, req2ids)
             for e in resp.values():
                 s['turns'] += 1
                 if e['bad']:
