@@ -25,7 +25,7 @@ description: '零 token 的 session 活動收割器。從 Claude Code 本來就�
    Windows 可用 `python` 執行同一支標準庫腳本；主機名由跨平台 API 取得，不需要 WSL。要固定跨機器日界線時加 `--timezone +08:00`（預設使用系統本地時區）。
 
    輸出每個活躍 session 的:時間段、專案@分支、turns、token 消耗、模型、工具直方圖、使用者原話(前 5 句)。機器可讀版加 `--format jsonl`。
-   口徑:turns＝API 回應數、token＝新增 in+out+cache_creation(不含 cache 讀取)。🔴 **一則回應只算一次**:transcript 把同一則回應拆成多行(每個 content block 一行)、每行都帶同一份 usage,收割器按 `message.id` 併成一則、四欄取最大——逐行相加會把 turns 與 tokens 灌水約 2 倍,別自己另寫一份逐行加。跨檔也只算一次:resume 會把舊訊息(同 `message.id`)複寫進新 session 檔,這則回應只算在最早出現的那個 session 與那天。
+   口徑:turns＝API 回應數、token＝新增 in+out+cache_creation(不含 cache 讀取)。🔴 **一則回應只算一次**:transcript 把同一則回應拆成多行(每個 content block 一行)、每行都帶同一份 usage,收割器按 `message.id` 併成一則、四欄取最大——逐行相加會把 turns 與 tokens 灌水約 2 倍,別自己另寫一份逐行加。跨檔也只算一次:resume 會把舊訊息(同 `message.id`)複寫進新 session 檔,這則回應只算一次,歸原 session(副本保留原 `sessionId`,以它對檔名;對不上才取時間戳最早者)與那天。
 
 2. **呈現**:把骨架整理給使用者看;若使用者追問某個 session 細節,再視需要深讀該 transcript(骨架裡有 session id 前綴可定位),**深讀前先告知會消耗較多 context**。
 

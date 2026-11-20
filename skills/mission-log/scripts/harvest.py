@@ -11,8 +11,9 @@
 #   不能用固定倍率還原)。做法:按 message.id 併成一則(沒 id 的行用 requestId 併回唯一對到的那則;兩個都沒有
 #   才逐行各算一則),四欄各取最大;turns = 回應數(含 0 token 的 <synthetic>);跨午夜的回應整則歸它時間戳最早
 #   那行的那天(兩趟掃描:先整檔求每則回應的最早時間戳,再歸日——不依賴檔案行序),翌日不重算。
-# - 🔴 跨檔也只算一次:resume／continue 會把舊訊息(同 message.id)複寫進新 session 檔。同一個 id 歸最早
-#   出現的那個檔(同時間取檔名排序在前者)與那天,其他檔的副本整行不算、只把用量併過去取最大。
+# - 🔴 跨檔也只算一次:resume／continue 會把舊訊息(同 message.id、同時間戳、原 sessionId)複寫進新 session 檔。
+#   同一個 id 歸行上 sessionId 對得上檔名的那個檔(原 session);都對不上才取時間戳最早、再取檔名排序在前者。
+#   其他檔的副本整行不算、只把用量併過去取最大。
 # - 🔴 沒見過的形狀不硬加、要回報:同 id 出現兩組都非零且不相等的 input/cache、同 id 對到兩個 requestId、
 #   同一個 requestId 對到兩個以上(非 synthetic 的)id ⇒ 該則標矛盾:turns 照算、tokens 不計入、
 #   session 記 usage_conflict、stderr 警告。取最大會拼出從沒存在過的用量,寧可擋。
@@ -165,14 +166,16 @@ def scan_lines(fh, timezone):
         rq = rq if isinstance(rq, str) and rq else None
         yield lineno, obj, ts, m, mid, rq, has_usage
 
-def response_index(fh, timezone):
+def response_index(fh, timezone, sid=None):
     """第一趟(整檔、與行序無關):建 requestId → 非 synthetic message.id 對照,並求每則回應最早一行的時間戳。
-    回 (req2ids, key_of, first_ts)。key_of(mid, rq, lineno) 給一行所屬回應的 key:有 id 用 id;沒 id 但
+    回 (req2ids, key_of, first_ts, home_ids)。home_ids=有任一行 sessionId 等於本檔 session(sid)的 message.id。key_of(mid, rq, lineno) 給一行所屬回應的 key:有 id 用 id;沒 id 但
     requestId 唯一對到一個 id ⇒ 用那個 id;否則用 requestId;兩個都沒有 ⇒ 逐行各一則。"""
-    req2ids, id_first, req_first = {}, {}, {}
-    for _, _, ts, m, mid, rq, has_usage in scan_lines(fh, timezone):
+    req2ids, id_first, req_first, home_ids = {}, {}, {}, set()
+    for _, obj, ts, m, mid, rq, has_usage in scan_lines(fh, timezone):
         if ts is False or not has_usage:
             continue
+        if mid and sid and obj.get('sessionId') == sid:
+            home_ids.add(mid)
         if mid and rq and m.get('model') != SYNTHETIC:
             req2ids.setdefault(rq, set()).add(mid)
         if mid:
@@ -192,7 +195,7 @@ def response_index(fh, timezone):
     for rq, ts in req_first.items():
         k = key_of(None, rq, 0)
         first_ts[k] = min(first_ts.get(k, ts), ts)
-    return req2ids, key_of, first_ts
+    return req2ids, key_of, first_ts, home_ids
 
 def harvest(projects_dir, day, timezone=None):
     if timezone:
@@ -202,27 +205,29 @@ def harvest(projects_dir, day, timezone=None):
     day_end = day_start + datetime.timedelta(days=1)
     sessions = {}
     bad_ts = bad_usage = conflicts = 0
-    # 第一趟(全部檔案):每檔的回應索引,以及每個 message.id 跨檔最早出現在哪個檔、哪個時間。
-    # resume／continue 會把舊訊息(同 message.id)複寫進新 session 檔;同一則回應跨檔只算一次,
-    # 歸最早出現的那個檔與那天(同時間取檔名排序在前者),其他檔的副本只把用量併過去(取最大)。
+    # 第一趟(全部檔案):每檔的回應索引,以及每個 message.id 跨檔歸哪個檔、哪天。
+    # resume／continue 會把舊訊息(同 message.id、同時間戳、保留原 sessionId)複寫進新 session 檔;
+    # 同一則回應跨檔只算一次。歸屬順序:① 行上 sessionId 等於檔名 session 的那個檔(原 session);
+    # ② 沒有檔對得上才取時間戳最早者;③ 再平手取檔名排序在前者。其他檔的副本只把用量併過去(取最大)。
     indexes = []
-    id_owner = {}  # message.id → (最早 ts, 檔案序號)
+    id_owner = {}  # message.id → (排序鍵 (非原檔, ts, 檔案序號), 歸日用的 ts, 檔案序號)
     for tx in sorted(glob.glob(os.path.join(projects_dir, '*', '*.jsonl'))):
         try:
             with open(tx, encoding='utf-8', errors='replace') as fh:
-                index = response_index(fh, timezone)
+                index = response_index(fh, timezone, os.path.splitext(os.path.basename(tx))[0])
         except OSError:
             continue
         fileno = len(indexes)
         indexes.append((tx, index))
         for k, ts in index[2].items():
             if k[0] == 'id':
+                rank = (k[1] not in index[3], ts, fileno)
                 cur = id_owner.get(k[1])
-                if cur is None or ts < cur[0]:
-                    id_owner[k[1]] = (ts, fileno)
+                if cur is None or rank < cur[0]:
+                    id_owner[k[1]] = (rank, ts, fileno)
     files = []     # 第二趟每檔的結果:(s, resp, req2ids)
     foreign = {}   # 檔案序號 → 別檔裡屬於它的回應副本 [(m, rq, rkey)]
-    for fileno, (tx, (req2ids, key_of, first_ts)) in enumerate(indexes):
+    for fileno, (tx, (req2ids, key_of, first_ts, _home)) in enumerate(indexes):
         try:
             fh = open(tx, encoding='utf-8', errors='replace')
         except OSError:
@@ -243,7 +248,7 @@ def harvest(projects_dir, day, timezone=None):
                 if rkey is not None:
                     owner_file = fileno
                     if rkey[0] == 'id' and rkey[1] in id_owner:
-                        owner, owner_file = id_owner[rkey[1]]
+                        _, owner, owner_file = id_owner[rkey[1]]
                     else:
                         owner = first_ts.get(rkey, ts)
                     if not day_start <= owner < day_end:

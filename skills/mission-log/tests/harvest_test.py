@@ -368,6 +368,25 @@ class HarvestTest(unittest.TestCase):
         d6 = self.rows(self.run_harvest('2026-01-06'))
         self.assertEqual([(r['session'], r['turns'], r['tokens']) for r in d6], [('oooo0002', 1, 10 + 2 + 3)])
 
+    def test_copy_sorting_first_with_equal_timestamps_goes_to_original_session(self):
+        # Resume copies keep the original timestamps and the original sessionId. When the copy's file
+        # sorts before the original, "earliest file" degenerates to filename order; the line's sessionId
+        # must decide which session owns the response. Totals stay the same either way.
+        def line(ts, out, mid, req, sid, tools=None):
+            d = asst_line(ts, usage(out), mid=mid, req=req, tools=tools)
+            d['sessionId'] = sid
+            return d
+        self.write_session('proj-a', 'zzzz-original', [
+            line('2026-01-05T04:00:00Z', 5, 'msg_A', 'req_1', 'zzzz-original', [{'type': 'tool_use', 'name': 'Bash'}]),
+        ])
+        self.write_session('proj-a', 'aaaa-resumed', [
+            line('2026-01-05T04:00:00Z', 5, 'msg_A', 'req_1', 'zzzz-original', [{'type': 'tool_use', 'name': 'Bash'}]),
+            line('2026-01-05T05:00:00Z', 2, 'msg_B', 'req_2', 'aaaa-resumed'),
+        ])
+        rows = {r['session']: (r['turns'], r['tokens'], r['tools']) for r in self.rows(self.run_harvest())}
+        self.assertEqual(rows, {'zzzz-ori': (1, 10 + 5 + 3, {'Bash': 1}),
+                                'aaaa-res': (1, 10 + 2 + 3, {})})
+
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
