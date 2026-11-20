@@ -35,7 +35,7 @@ license: MIT
 
 **📌 派工的五個硬層事實**（Claude Code 實測；其他工具對照自家機制）：
 
-1. **effort 怎麼繼承**：Agent tool 沒有 `effort` 參數，子代理跟主 session 同 effort——主 session 開最深推理時，派出去的每一支也都是最深，估算要照這個算。Workflow 的 `agent()` 可以寫 `effort`，執行／驗證寫 `'medium'` 以上，🚫 別拿 `'low'` 當預設（省下的是推理深度，換來的是草稿品質）。
+1. **effort 怎麼繼承**：Agent tool 有沒有 `effort` 參數**隨宿主 CLI 版本而異**——要知道就看當下 Agent tool 的參數定義，別憑記憶。有這個參數時，宿主的定義通常要求「只在使用者、專案指令或 skill 明確要求某個 effort 時才設」，沒要求就省略；`subagent_type: 'fork'` 一律忽略它。沒帶 `effort`（或宿主沒有這個參數）時，子代理沿用它定義檔設定的 effort，否則跟主 session 同 effort——主 session 開最深推理時，派出去的每一支也可能都是最深，估算要照這個算。Workflow 的 `agent()` 可以寫 `effort`，執行／驗證寫 `'medium'` 以上，🚫 別拿 `'low'` 當預設（省下的是推理深度，換來的是草稿品質）。
 2. 🚫 **`subagent_type: 'fork'` 不當執行者**：fork 繼承父 session 整段 context、固定跑父模型（`model` 參數被忽略），肥 session＋旗艦檔＝最燒的組合。執行者一律 fresh general-purpose 或 Workflow `agent()`，並明寫 `model`。
 3. **主 session context 肥時，派乾淨執行者可能反而省**：省的是新增 token（輸入＋輸出＋快取寫入）的檔位單價差與旗艦配額，快取讀取各檔位價差不大。判準：兩條路用**同一組假設**估 API 等值——自己做＝預估呼叫數 × 主 session 每次呼叫的新增量；派工＝每支固定開場成本（載入規則、記憶、工具定義，實測在數萬 tokens 量級）＋預估呼叫數 × 子代理每次呼叫量——**派工 ≤ 自己做的 1.2 倍就派**，不必等到明顯更省；估算是區間不是點，差在 ±20% 內算「差不多」。反面照舊：一個檔幾十行、有測試的小改動，開場行李比任務重，不派。
 4. **別名實跑哪一版跟宿主 CLI 版本走**：`sonnet`／`opus`／`haiku` 這類別名指向哪個具體型號由 CLI 決定、改版會變；要確認實跑的是哪版，看子代理 transcript 的 `model` 欄，別看自己寫了什麼。
