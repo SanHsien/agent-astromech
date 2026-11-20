@@ -381,7 +381,7 @@ ref 也對不回 session id，我無法驗證哪一個是」——它辨識出**
 for s in /bin/sh /bin/dash /bin/bash /bin/ksh /bin/zsh; do $s -n skills/ai-review/scripts/ai-review.sh; done
 ```
 
-行為矩陣**已隨 skill 出貨**＝`skills/ai-review/tests/matrix.sh`（46 項，stub 後端不燒額度、
+行為矩陣**已隨 skill 出貨**＝`skills/ai-review/tests/matrix.sh`（52 項，stub 後端不燒額度、
 產出寫暫存區不弄髒目錄、開頭自動 `unset` 外部 `AI_REVIEW_*` 變數以隔離環境、全過回 0 可進 CI）：
 
 ```bash
@@ -487,16 +487,16 @@ skill 層三項行為皆正確、damage-report 整合節可達）。
 
 `--timeout <正整數秒>`／`AI_REVIEW_TIMEOUT_SECONDS` 對自訂後端、Codex 登入前置檢查與實際 review 呼叫都生效；預設 600 秒。Linux／Windows Git Bash 使用 GNU coreutils `timeout`，其他 POSIX 環境使用內建 watchdog，逾時先 TERM、兩秒後仍存活才 KILL。
 
-**通過**：自訂後端、Codex 登入檢查與 Codex review 三條 stub 路徑睡眠超過一秒時皆回 `failed_timeout`＋exit 2；timeout 非正整數在後端啟動前回 exit 1。狀態（2026-08-24）：✅ Windows Git Bash 已納入矩陣（現為 46 項）；Linux 5-shell 由 exact-SHA CI 驗證。
+**通過**：自訂後端、Codex 登入檢查與 Codex review 三條 stub 路徑睡眠超過一秒時皆回 `failed_timeout`＋exit 2；timeout 非正整數在後端啟動前回 exit 1。狀態（2026-08-24）：✅ Windows Git Bash 已納入矩陣（現為 52 項）；Linux 5-shell 由 exact-SHA CI 驗證。
 
-⚠️ **已知邊界限制**：逾時在 coreutils `timeout` 下終止整個行程群組；無 coreutils 時退回 watchdog，只殺 `sh -c` 或後端本身，子行程與孫行程可能殘留（脫離群組者在兩種模式下都可能殘留）。已在 `skills/ai-review/SKILL.md` 註記。
+⚠️ **已知邊界限制**：逾時在 coreutils `timeout` 下終止整個行程群組；無 coreutils 時退回 watchdog，只殺 `sh -c` 或後端本身，子行程與孫行程可能殘留（脫離群組者在兩種模式下都可能殘留）。已在 `skills/ai-review/SKILL.md` 註記。watchdog 自己的計時 `sleep` 不在此列：命令先結束時會一起被清掉，矩陣以「命令結束後沒有殘留 sleep 行程」一項把關（沒有 `ps -ef` 的環境記為略過）。
 
 ### E-05 ✋ 平台與方案覆蓋
 
 >（編號跳序＝歷史演進痕跡，刻意保留：E-05 性質是收尾總查，物理位置固定在 E-09 之後，編號不重排。）
 
 **通過**：README 宣稱支援的平台與帳號方案都實跑過。
-狀態（2026-08-24）：✅ **Linux 經 CI（ubuntu-latest）**——ai-review 矩陣 5 shell × 46 項、ai-search 5 shell × 44 項與 harvest 測試隨每次 push 實跑；
+狀態（2026-08-24）：✅ **Linux 經 CI（ubuntu-latest）**——ai-review 矩陣 5 shell × 52 項、ai-search 5 shell × 44 項與 harvest 測試隨每次 push 實跑；
 ✅ **Windows 11 Git Bash 已納入 canonical gate，但 POSIX `0600` 由 Linux CI 驗證**。
 
 🚫 **免費方案帳號：刻意不驗，本項就此結案（2026-09-07 決定）** ——

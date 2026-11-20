@@ -33,7 +33,7 @@ That's agent-astromech's job description — 14 skills covering things that "won
 
 Claude sessions are **amnesiac**: close the conversation and everything not written to disk evaporates. The common theme here is fighting that amnesia — every skill in the table covers one link of the amnesia chain. All of it was iterated out of real daily-driver usage, not theory.
 
-The development process eats the same rules: **before every release, the work goes to a different model family for review** (asking the same model to "check again" mostly re-confirms what it already believed). `ai-review` itself was built this way — three rounds of cross-model review caught 21 defects, 13 of which were introduced by the previous round's own fixes, and 46 regression tests ship in the box. All of it is checkable: method and evidence in [docs/TEST_PLAN.md](docs/TEST_PLAN.md), maintained-fork fixes in [Releases](https://github.com/SanHsien/agent-astromech/releases).
+The development process eats the same rules: **before every release, the work goes to a different model family for review** (asking the same model to "check again" mostly re-confirms what it already believed). `ai-review` itself was built this way — three rounds of cross-model review caught 21 defects, 13 of which were introduced by the previous round's own fixes, and 52 regression tests ship in the box. All of it is checkable: method and evidence in [docs/TEST_PLAN.md](docs/TEST_PLAN.md), maintained-fork fixes in [Releases](https://github.com/SanHsien/agent-astromech/releases).
 
 ## Compatibility matrix
 
@@ -141,7 +141,7 @@ Claude follows the zh-TW instructions and replies in whatever language you speak
 | new-mission | None (pure rules; the `ai-review` hookup in step 3's advanced section is an optional cross-reference) |
 | damage-report | None (pure rules; the `/dropoff` mention in Q5 and the `ai-review` upgrade section are optional cross-references) |
 | blind-review | **An environment that can dispatch a read-only subagent** (the attacker not having the conversation is the whole premise; with no subagents, open a clean chat by hand instead). Complementary to `ai-review`, not overlapping: this one swaps context, that one swaps model family |
-| ai-review | **A review backend** (Codex CLI by default; `AI_REVIEW_CMD` swaps in any command that reads stdin and writes stdout) plus a POSIX shell. A built-in 600-second wall-clock timeout is adjustable with `--timeout`. No extra packages: no npm module, no brew formula, no API key of your own. Ships 46 regression tests (`tests/matrix.sh`, no quota burned) |
+| ai-review | **A review backend** (Codex CLI by default; `AI_REVIEW_CMD` swaps in any command that reads stdin and writes stdout) plus a POSIX shell. A built-in 600-second wall-clock timeout is adjustable with `--timeout`. No extra packages: no npm module, no brew formula, no API key of your own. Ships 52 regression tests (`tests/matrix.sh`, no quota burned) |
 | ai-search | **A web-searching backend** (Codex CLI's built-in `web_search` by default; `AI_SEARCH_CMD` swaps it, but the replacement must also search) plus a POSIX shell. No extra packages. Ships 44 regression tests (`tests/matrix.sh`, no quota burned, no network) |
 | token-optimizer | None (rules-only; Workflow-specific items need the Workflow tool — Workflow is Claude Code's multi-agent orchestration feature; §1's advanced backstop is Claude Code CLI-only) |
 | flight-to-calendar | **Google Calendar MCP connector** (hard dependency) |

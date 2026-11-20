@@ -160,6 +160,21 @@ ST=$(printf '%s' "$OUT" | sed -n 's/^AI_REVIEW_STATUS: //p' | tail -1)
 chk "watchdog：stdin 關閉仍印出狀態" failed_quota 2 "$ST" "$RC"
 run env PATH="$NOCORE:/usr/bin:/bin" AI_REVIEW_CMD='sleep 5; printf should_not_finish' $SH "$S" "$W/sample.py" --rubric code --timeout 1
 chk "watchdog：逾時仍判 failed_timeout" failed_timeout 2 "$ST" "$RC"
+# 命令正常結束後，watcher 底下的 `sleep <timeout>` 不得被留成孤兒行程（每次執行都會殘留到逾時秒數結束）。
+# 用一個不會撞到其他行程的秒數辨認；殘留的一律清掉，避免測試本身留下行程。
+if ps -ef >/dev/null 2>&1; then
+	run env PATH="$NOCORE:/usr/bin:/bin" AI_REVIEW_CMD='cat' $SH "$S" "$W/sample.py" --rubric code --no-save --timeout 7319
+	sleep 1
+	LEFT=$(ps -ef | grep '[s]leep 7319' | awk '{print $2}')
+	if [ -z "$LEFT" ]; then
+		ok_ "watchdog：命令結束後沒有殘留 sleep 行程"
+	else
+		no_ "watchdog：命令結束後殘留 sleep 行程（pid $(echo $LEFT)）"
+		kill $LEFT 2>/dev/null || true
+	fi
+else
+	skip_ "watchdog：殘留行程檢查（沒有可用的 ps -ef）"
+fi
 
 echo "-- D. 呼叫鏈：降級不得中斷上層 --"
 cat >"$W/chain.sh" <<EOF

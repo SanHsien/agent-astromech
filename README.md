@@ -33,7 +33,7 @@ agent-astromech 就是這個定位 —— 14 支 skills，管的都是「不做�
 
 Claude 的 session 是**失憶的**：對話一關，沒寫進磁碟的東西全部蒸發。這套 skills 的共同主題就是對抗失憶——上表每一支，管的都是失憶鏈上的一段。全部是在真實日常使用中踩坑迭代出來的，不是理論設計。
 
-開發流程自己也吃同一套規矩：**每版出貨前，先把產出送給另一個模型家族審一輪**（同一個模型再檢查一次，只會確認它本來就相信的事）。`ai-review` 這支就是這樣做出來的——三輪跨模型二審抓出 21 個缺陷、其中 13 個是前一輪修法自己帶出來的，46 項回歸測試隨包出貨。這些都查得到：測試方法與證據見 [docs/TEST_PLAN.md](docs/TEST_PLAN.md)，fork 每一版修了什麼見 [Releases](https://github.com/SanHsien/agent-astromech/releases)。
+開發流程自己也吃同一套規矩：**每版出貨前，先把產出送給另一個模型家族審一輪**（同一個模型再檢查一次，只會確認它本來就相信的事）。`ai-review` 這支就是這樣做出來的——三輪跨模型二審抓出 21 個缺陷、其中 13 個是前一輪修法自己帶出來的，52 項回歸測試隨包出貨。這些都查得到：測試方法與證據見 [docs/TEST_PLAN.md](docs/TEST_PLAN.md)，fork 每一版修了什麼見 [Releases](https://github.com/SanHsien/agent-astromech/releases)。
 
 ## 相容性矩陣
 
@@ -141,7 +141,7 @@ Claude 讀繁中指令、照樣用你的對話語言回覆 —— 英文使用�
 | new-mission | 無（純規則;第 3 步進階節的 `ai-review` 送審是選用交叉引用） |
 | damage-report | 無（純規則;第 5 問提到的 `/dropoff`、進階節的 `ai-review` 都是選用交叉引用） |
 | blind-review | **能派唯讀子代理的環境**（子代理拿不到對話是本 skill 的前提；派不出來就人工另開一個乾淨對話代替）。與 `ai-review` 互補不重疊：這支換脈絡，那支換模型家族 |
-| ai-review | **二審後端**(預設 Codex CLI;`AI_REVIEW_CMD` 可換任何讀 stdin／吐 stdout 的命令)＋POSIX shell。內建 600 秒 wall-clock timeout，可用 `--timeout` 調整。無額外套件依賴:不需 npm 套件、brew formula 或自備 API key。附 46 項回歸測試(`tests/matrix.sh`,不燒額度) |
+| ai-review | **二審後端**(預設 Codex CLI;`AI_REVIEW_CMD` 可換任何讀 stdin／吐 stdout 的命令)＋POSIX shell。內建 600 秒 wall-clock timeout，可用 `--timeout` 調整。無額外套件依賴:不需 npm 套件、brew formula 或自備 API key。附 52 項回歸測試(`tests/matrix.sh`,不燒額度) |
 | ai-search | **會上網搜尋的後端**(預設 Codex CLI 內建 `web_search`;`AI_SEARCH_CMD` 可換,但換的後端也得會搜尋)＋POSIX shell。無額外套件依賴。附 44 項回歸測試(`tests/matrix.sh`,不燒額度、不連網) |
 | token-optimizer | 無（規則類 skill;Workflow 相關條目需要有 Workflow tool 的環境——Workflow＝Claude Code 的多代理編排功能;§1「進階兜底」僅 Claude Code CLI 生效） |
 | flight-to-calendar | **Google Calendar MCP connector**（硬依賴） |

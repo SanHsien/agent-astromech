@@ -147,7 +147,7 @@ ERR_FILE="$TMPD/stderr.txt"
 # ── 有界執行 ────────────────────────────────────────────────────────
 # Linux／Windows Git Bash 優先使用 GNU coreutils timeout；macOS 等沒有 coreutils
 # 的環境改用 POSIX shell watchdog。124 保留給本 wrapper 表示 wall-clock timeout。
-# watchdog 先 TERM、兩秒後仍存活才 KILL，並在命令先結束時立即清掉 watcher。
+# watchdog 先 TERM、兩秒後仍存活才 KILL；命令先結束時 watcher 約一秒內自行退出，不留殘留行程。
 TIMEOUT_BIN=""
 for _timeout_candidate in timeout gtimeout; do
 	_timeout_path=$(command -v "$_timeout_candidate" 2>/dev/null || true)
@@ -172,19 +172,39 @@ run_bounded() {
 	# 重導向放在複合命令上：stdin 已關閉時只是這個命令失敗，不會像 `exec` 那樣直接結束整支腳本。
 	{ "$@" <&3 3<&- & } 3<&0
 	_rb_command_pid=$!
+	# watcher 以一秒為單位輪詢，命令一結束就自己退出；呼叫端 wait 它而不是 kill 它。
+	# 舊做法是一支 `sleep <timeout>` 再由呼叫端 kill watcher：kill 只殺到 subshell，sleep 被 init
+	# 收養、殘留到逾時秒數結束（每次執行都留一支）；在 sleep 上掛 trap 也有訊號競態（Git Bash 實測仍會漏）。
+	# 輪詢不靠訊號清理，每支 sleep 都被 wait 到；代價是命令結束後最多多等約一秒。
 	(
-		sleep "$_rb_seconds"
+		_rb_deadline=$(date +%s 2>/dev/null)
+		case "$_rb_deadline" in
+			'' | *[!0-9]*) _rb_deadline="" ;;
+			*) _rb_deadline=$((_rb_deadline + _rb_seconds)) ;;
+		esac
+		_rb_left=$_rb_seconds
+		while kill -0 "$_rb_command_pid" 2>/dev/null; do
+			if [ -n "$_rb_deadline" ]; then
+				[ "$(date +%s)" -ge "$_rb_deadline" ] && break
+			else
+				[ "$_rb_left" -le 0 ] && break
+				_rb_left=$((_rb_left - 1))
+			fi
+			sleep 1
+		done
 		if kill -0 "$_rb_command_pid" 2>/dev/null; then
 			: >"$_rb_marker"
 			kill -TERM "$_rb_command_pid" 2>/dev/null || true
-			sleep 2
+			for _rb_grace in 1 2; do
+				kill -0 "$_rb_command_pid" 2>/dev/null || break
+				sleep 1
+			done
 			kill -KILL "$_rb_command_pid" 2>/dev/null || true
 		fi
 	) &
 	_rb_watcher_pid=$!
 	wait "$_rb_command_pid"
 	_rb_rc=$?
-	kill "$_rb_watcher_pid" 2>/dev/null || true
 	wait "$_rb_watcher_pid" 2>/dev/null || true
 	[ -f "$_rb_marker" ] && return 124
 	return "$_rb_rc"
