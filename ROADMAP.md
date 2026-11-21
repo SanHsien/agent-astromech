@@ -10,11 +10,11 @@
 ## 近期：可以直接動手
 | 項目 | 為什麼 | 驗收方式 | 建議執行者 | 證據 |
 | --- | --- | --- | --- | --- |
+| 同步上游新 commit | 觸發條件已成立（2026-11-21 查：`python tools/check_upstream_updates.py --strict` exit 1：上游 head `610939d`，baseline `32bef4e` 後 6 個新 commit；`Upstream check` 2026-11-16 failure）。原條件：`Upstream check` workflow 在 `main` 轉為 failure（代表上游有未審項目），或週期性檢查發現上游前進 | 逐筆判斷 adopt／defer／skip，寫進 `docs/UPSTREAM.md`；`python tools/check_upstream_updates.py --strict` exit 0；完整 gate 通過後才推進 `tools/upstream_baseline.json`；`FORK.md`「同步方法」被遵守 | Claude Sonnet | `tools/upstream_baseline.json`；`docs/UPSTREAM.md`；`Upstream check` workflow 結果（見現況段） |
 
 ## 中期：等條件成立再做
 | 項目 | 觸發條件 | 驗收方式 | 建議執行者 | 證據 |
 | --- | --- | --- | --- | --- |
-| 同步上游新 commit | `Upstream check` workflow 在 `main` 轉為 failure（代表上游有未審項目），或週期性檢查發現上游前進 | 逐筆判斷 adopt／defer／skip，寫進 `docs/UPSTREAM.md`；`python tools/check_upstream_updates.py --strict` exit 0；完整 gate 通過後才推進 `tools/upstream_baseline.json`；`FORK.md`「同步方法」被遵守 | Claude Sonnet | `tools/upstream_baseline.json`；`docs/UPSTREAM.md`；`Upstream check` workflow 結果（見現況段） |
 | 評估採納上游 `systems-check` 與 tag 版號 CI 步驟 | 上游修好 Windows 相容（`import fcntl`），或維護者決定由本 fork 自行改寫為跨平台並補 Windows 測試 | 在 Windows 原生 `selfcheck_scan.py --selftest` 全過；skill 計數、README 雙語、plugin metadata、adapter、TEST_PLAN、contract checker 一致連動；`dev_check.ps1` 綠 | Claude Opus | `docs/UPSTREAM.md:129`、`:130`；`docs/DECISIONS.md:160` |
 | 發布下一個 release | 維護者決定要固定一個可回溯版本（v0.9.1 之後已有 `ai-review` watchdog 與 freshness 修正） | `plugin.json` 版號與 tag 一致；`gh release list --repo SanHsien/agent-astromech` 出現新版；發版前 `dev_check` 與 CI 綠 | 維護者 | `gh release list --repo SanHsien/agent-astromech`；`.claude-plugin/plugin.json:4` |
 | 自行重跑 CROSS-01 per-agent 驗證 | 維護者需要對外宣稱 14 支 skill 的跨 agent 相容數字 | `docs/TEST_PLAN.md` 記錄以本 fork 14 支 working tree 實測的數字、日期與 agent 版本，不與上游 12 支數字相加 | 維護者 | `docs/UPSTREAM.md` 2026-09-05 段 `73d79e4` 列（defer） |
