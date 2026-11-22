@@ -158,3 +158,10 @@ skip：12 支版的英文小抄與圖卡對不上本 fork 的 14 支，且無圖
 ## 2026-10-25：審查上游 `32bef4e`（9 個 commit）
 
 adopt：`0d1d9ee`（收割器一則回應只算一次，移植做法進 fork 已分歧的 `harvest.py`）、`37ef4d7`／`142b003`（token-optimizer）、`fd00d5e`（damage-report 字句）。defer：`systems-check` 新 skill（Windows 原生 `import fcntl` 即失敗、selftest 21/39，主平台跑不起來）與 `32bef4e` 的 tag 版號 CI 步驟。Baseline 推進至 `32bef4e`，表示已審查，defer 項不算已合併。證據見 `docs/UPSTREAM.md` 2026-10-25 段。
+
+## 2026-11-22：`token-optimizer` 回報格式拿掉「三行」上限（上游檔分歧）
+
+prompt 稽核（2026-11-22）指出「三行摘要」是輸出行數上限：檔案多或測試失敗要說原因時會把回報截斷，
+而真正的目標（不把原始 diff／log 灌回主編排者）同段已寫清楚。`skills/token-optimizer/SKILL.md` 與兩份簡版
+改成「只回結論，不附過程與原始輸出」。`SKILL.md` 是上游檔，之後同步上游 `token-optimizer` 時這一行會衝突，
+以本條為準保留 fork 寫法。
